@@ -1,12 +1,22 @@
-import React, { useState, useMemo } from 'react';
-import { Search, ShoppingBag, ShieldCheck, Clock, Truck, Pill, ArrowRight } from 'lucide-react';
-import { Input } from '../components/ui/Input';
+import { useState, useMemo } from 'react';
+import { Search, ShieldCheck, Clock, Truck, Pill, ArrowRight, MapPin, Phone, Mail } from 'lucide-react';
 import { Button } from '../components/ui/Button';
+import { formatRupiah } from '../utils';
 
-export function Storefront({ products }) {
+export function Storefront({ products = [], settings }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   
+  const namaApotek = settings?.nama_apotek || 'Apotek Medika Sejahtera';
+  const alamatApotek = settings?.alamat || 'Jl. Kesehatan Raya No. 88, Kemang, Jakarta Selatan';
+  const waNumber = settings?.nomor_wa || '6281299887766';
+  const telpNumber = settings?.nomor_telepon || '021-7890-1234';
+  const emailApotek = settings?.email || 'kontak@medikasejahtera.id';
+  const jamOperasional = settings?.jam_operasional || {
+    weekday: 'Senin - Jumat: 08:00 - 22:00',
+    weekend: 'Sabtu - Minggu: 09:00 - 21:00'
+  };
+
   // Hanya tampilkan produk yang ready stock
   const availableProducts = useMemo(() => {
     return products.filter(product => product.stock > 0);
@@ -15,15 +25,17 @@ export function Storefront({ products }) {
   const filteredProducts = useMemo(() => {
     return availableProducts.filter(product => {
       const matchSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          product.category.toLowerCase().includes(searchTerm.toLowerCase());
+                          (product.category && product.category.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchCategory = categoryFilter === 'All' || product.category === categoryFilter;
       return matchSearch && matchCategory;
     });
   }, [availableProducts, searchTerm, categoryFilter]);
 
   const categories = useMemo(() => {
-    return ['All', ...new Set(products.map(p => p.category))];
-  }, [products]);
+    const base = settings?.kategori || [];
+    const fromProducts = products.map(p => p.category).filter(Boolean);
+    return ['All', ...Array.from(new Set([...base, ...fromProducts]))];
+  }, [settings, products]);
 
   const getProductImage = (category) => {
     const images = {
@@ -32,20 +44,28 @@ export function Storefront({ products }) {
       'Antibiotik': 'https://images.unsplash.com/photo-1628771065518-0d82f1938462?auto=format&fit=crop&w=400&q=80',
       'Obat Bebas': 'https://images.unsplash.com/photo-1607619056574-7b8d3ee536b2?auto=format&fit=crop&w=400&q=80',
       'Sirup & Cairan': 'https://images.unsplash.com/photo-1584017911766-d451b3d0e843?auto=format&fit=crop&w=400&q=80',
-      'P3K & Perawatan': 'https://images.unsplash.com/photo-1583324113626-70df0f4deaab?auto=format&fit=crop&w=400&q=80'
+      'P3K & Perawatan': 'https://images.unsplash.com/photo-1583324113626-70df0f4deaab?auto=format&fit=crop&w=400&q=80',
+      'Obat Maag': 'https://images.unsplash.com/photo-1584308666744-24d5e4b2d3dc?auto=format&fit=crop&w=400&q=80',
+      'Obat Batuk': 'https://images.unsplash.com/photo-1584017911766-d451b3d0e843?auto=format&fit=crop&w=400&q=80',
+      'Antihistamin': 'https://images.unsplash.com/photo-1607619056574-7b8d3ee536b2?auto=format&fit=crop&w=400&q=80',
+      'Anti Jamur': 'https://images.unsplash.com/photo-1583324113626-70df0f4deaab?auto=format&fit=crop&w=400&q=80'
     };
     return images[category] || 'https://images.unsplash.com/photo-1576602976047-174e57a47881?auto=format&fit=crop&w=400&q=80';
   };
 
-  const formatRupiah = (number) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(number);
+  const handleOrderWhatsApp = (product) => {
+    const message = encodeURIComponent(
+      `Halo ${namaApotek}, saya ingin memesan obat berikut:\n\n*Nama Obat:* ${product.name}\n*Kategori:* ${product.category}\n*Harga:* ${formatRupiah(product.price)}\n\nMohon info ketersediaan dan cara pembayarannya. Terima kasih!`
+    );
+    const cleanWa = waNumber.replace(/[^0-9]/g, '');
+    const whatsappUrl = `https://wa.me/${cleanWa}?text=${message}`;
+    window.open(whatsappUrl, '_blank');
   };
 
-  const handleOrderWhatsApp = (product) => {
-    const phoneNumber = "6281234567890"; // Ganti dengan nomor WhatsApp Apotek yang sebenarnya
-    const message = `Halo Apotek, saya ingin memesan obat berikut:%0A%0A*Nama Obat:* ${product.name}%0A*Kategori:* ${product.category}%0A*Harga:* ${formatRupiah(product.price)}%0A%0AMohon info ketersediaan dan cara pembayarannya. Terima kasih!`;
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
-    window.open(whatsappUrl, '_blank');
+  const handleConsultWhatsApp = () => {
+    const message = encodeURIComponent(`Halo ${namaApotek}, saya ingin berkonsultasi mengenai rekomendasi obat.`);
+    const cleanWa = waNumber.replace(/[^0-9]/g, '');
+    window.open(`https://wa.me/${cleanWa}?text=${message}`, '_blank');
   };
 
   return (
@@ -64,19 +84,19 @@ export function Storefront({ products }) {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-tosca-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-tosca-500"></span>
                 </span>
-                #1 Apotek Terpercaya di Barru
+                #1 {namaApotek}
               </span>
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-black text-slate-900 tracking-tight mb-8 leading-tight">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight mb-6 leading-tight">
                 Kesehatan Anda Adalah <span className="text-transparent bg-clip-text bg-gradient-to-r from-tosca-500 to-tosca-700">Prioritas Kami</span>
               </h1>
-              <p className="text-lg md:text-xl text-slate-600 mb-12 leading-relaxed max-w-2xl mx-auto lg:mx-0">
-                Dapatkan obat-obatan berkualitas, asli, dan terjamin dengan layanan cepat dan ramah dari Apotek.
+              <p className="text-base md:text-lg text-slate-600 mb-8 leading-relaxed max-w-2xl mx-auto lg:mx-0">
+                Dapatkan obat-obatan berkualitas, asli, dan terjamin dengan layanan cepat dan ramah dari {namaApotek}.
               </p>
               
               <Button 
                 size="lg" 
-                className="px-8 py-4 rounded-full text-lg shadow-lg hover:shadow-tosca-500/25 transition-all gap-2"
-                onClick={() => document.getElementById('products').scrollIntoView({ behavior: 'smooth' })}
+                className="px-8 py-4 rounded-full text-base shadow-lg hover:shadow-tosca-500/25 transition-all gap-2"
+                onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
               >
                 Lihat Katalog Obat <ArrowRight size={20} />
               </Button>
@@ -90,7 +110,7 @@ export function Storefront({ products }) {
                 <img 
                   src="https://images.unsplash.com/photo-1631549916768-4119b2e5f926?auto=format&fit=crop&w=800&q=80" 
                   alt="Layanan Apoteker Profesional" 
-                  className="w-full h-[400px] lg:h-[520px] object-cover group-hover:scale-105 transition-transform duration-1000 ease-out"
+                  className="w-full h-[380px] lg:h-[480px] object-cover group-hover:scale-105 transition-transform duration-1000 ease-out"
                 />
               </div>
               
@@ -115,7 +135,7 @@ export function Storefront({ products }) {
                   </div>
                   <div>
                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Layanan Cepat</p>
-                    <p className="font-black text-slate-900 text-sm">Buka 08:00 - 22:00</p>
+                    <p className="font-black text-slate-900 text-sm">Buka Setiap Hari</p>
                   </div>
                 </div>
               </div>
@@ -159,7 +179,7 @@ export function Storefront({ products }) {
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
             <div>
               <h2 className="text-3xl md:text-4xl font-black text-slate-900">Katalog Obat <span className="text-tosca-500">Tersedia</span></h2>
-              <p className="mt-3 text-slate-500 text-lg">Temukan {availableProducts.length} produk kesehatan terbaik untuk Anda hari ini.</p>
+              <p className="mt-3 text-slate-500 text-base">Temukan {availableProducts.length} produk kesehatan terbaik untuk Anda hari ini.</p>
             </div>
             
             <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
@@ -193,11 +213,11 @@ export function Storefront({ products }) {
                 <Search className="h-10 w-10 text-slate-300" />
               </div>
               <h3 className="text-2xl font-bold text-slate-900 mb-2">Produk tidak ditemukan</h3>
-              <p className="text-slate-500 max-w-md mx-auto mb-8">Maaf, kami tidak dapat menemukan obat yang cocok dengan pencarian Anda. Silakan coba kata kunci lain.</p>
+              <p className="text-slate-500 max-w-md mx-auto mb-8">Maaf, kami tidak dapat menemukan obat yang cocok dengan pencarian Anda.</p>
               <Button 
                 variant="outline" 
                 size="lg"
-                onClick={() => setSearchTerm('')}
+                onClick={() => { setSearchTerm(''); setCategoryFilter('All'); }}
               >
                 Tampilkan Semua Produk
               </Button>
@@ -210,7 +230,6 @@ export function Storefront({ products }) {
                   className="bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden group flex flex-col h-full animate-slide-in-bottom"
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
-                  {/* Dynamic Image with Gradient Overlay */}
                   <div className="h-48 bg-slate-100 relative overflow-hidden group">
                     <img 
                       src={getProductImage(product.category)} 
@@ -219,7 +238,7 @@ export function Storefront({ products }) {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                     <div className="absolute top-4 right-4 z-20">
-                      <span className="inline-flex items-center rounded-full bg-white/95 backdrop-blur-sm px-3 py-1.5 text-xs font-bold text-tosca-700 shadow-sm border border-tosca-100">
+                      <span className="inline-flex items-center rounded-full bg-white/95 backdrop-blur-sm px-3 py-1 text-xs font-bold text-tosca-700 shadow-sm border border-tosca-100">
                         {product.category}
                       </span>
                     </div>
@@ -227,18 +246,18 @@ export function Storefront({ products }) {
                   
                   <div className="p-6 flex-1 flex flex-col">
                     <div className="mb-4">
-                      <h3 className="text-xl font-bold text-slate-900 mb-1 group-hover:text-tosca-600 transition-colors line-clamp-2">{product.name}</h3>
-                      <p className="text-sm text-slate-500">Tersedia: <span className="font-semibold text-slate-700">{product.stock} pcs</span></p>
+                      <h3 className="text-lg font-bold text-slate-900 mb-1 group-hover:text-tosca-600 transition-colors line-clamp-2">{product.name}</h3>
+                      <p className="text-xs text-slate-500">Tersedia: <span className="font-semibold text-slate-700">{product.stock} pcs</span></p>
                     </div>
                     
                     <div className="mt-auto pt-4 border-t border-slate-100">
-                      <p className="text-2xl font-black text-slate-900 mb-4">{formatRupiah(product.price)}</p>
+                      <p className="text-xl font-black text-slate-900 mb-4">{formatRupiah(product.price)}</p>
                       <Button 
-                        className="w-full flex justify-center gap-2"
+                        className="w-full flex justify-center gap-2 text-sm"
                         onClick={() => handleOrderWhatsApp(product)}
                       >
                         Pesan via WhatsApp
-                        <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                        <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                       </Button>
                     </div>
                   </div>
@@ -250,13 +269,17 @@ export function Storefront({ products }) {
       </section>
 
       {/* CTA Section */}
-      <section className="bg-tosca-600 py-16 relative overflow-hidden">
+      <section id="about" className="bg-tosca-600 py-16 relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1587854692152-cbe660dbde88?q=80&w=2069&auto=format&fit=crop')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">Butuh Konsultasi Obat?</h2>
-          <p className="text-tosca-100 text-lg mb-8 max-w-2xl mx-auto">Apoteker kami siap membantu Anda memilih obat yang tepat untuk keluhan Anda.</p>
-          <Button size="lg" className="bg-white text-tosca-700 hover:bg-slate-50 rounded-full shadow-lg">
-            Hubungi Apoteker
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Butuh Konsultasi Obat?</h2>
+          <p className="text-tosca-100 text-base mb-8 max-w-2xl mx-auto">Apoteker profesional kami di {namaApotek} siap membantu Anda memilih obat yang tepat untuk keluhan Anda.</p>
+          <Button 
+            size="lg" 
+            onClick={handleConsultWhatsApp}
+            className="bg-white text-tosca-700 hover:bg-slate-50 rounded-full shadow-lg font-bold"
+          >
+            Hubungi Apoteker via WhatsApp
           </Button>
         </div>
       </section>
@@ -265,53 +288,49 @@ export function Storefront({ products }) {
       <footer className="bg-slate-950 text-slate-400 py-16 border-t border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-4 gap-12">
           <div className="md:col-span-2">
-            <h4 className="text-white text-2xl font-black mb-6 flex items-center gap-3">
+            <h4 className="text-white text-2xl font-black mb-4 flex items-center gap-3">
               <div className="bg-tosca-500 p-2 rounded-lg">
                 <Pill className="h-6 w-6 text-white" />
               </div>
-              Apotek 
+              {namaApotek}
             </h4>
             <p className="mb-6 text-sm leading-relaxed max-w-md text-slate-400">
-              Mitra kesehatan keluarga Anda di Kabupaten Barru. Menyediakan obat-obatan lengkap, terjamin, dan pelayanan kefarmasian profesional.
+              Mitra kesehatan keluarga Anda di {alamatApotek.split(',')[1] || 'Sulawesi Selatan'}. Menyediakan obat-obatan lengkap, terjamin, dan pelayanan kefarmasian profesional.
             </p>
-            <div className="flex gap-4">
-              {/* Social icons placeholders */}
-              <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-tosca-500 hover:text-white transition-colors cursor-pointer">IG</div>
-              <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-tosca-500 hover:text-white transition-colors cursor-pointer">FB</div>
-              <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-tosca-500 hover:text-white transition-colors cursor-pointer">WA</div>
-            </div>
           </div>
           <div>
-            <h4 className="text-white text-lg font-bold mb-6">Jam Operasional</h4>
-            <ul className="space-y-4 text-sm">
-              <li className="flex flex-col gap-1"><span className="text-slate-500">Senin - Jumat</span> <span className="text-white font-medium">08:00 - 22:00</span></li>
-              <li className="flex flex-col gap-1"><span className="text-slate-500">Sabtu - Minggu</span> <span className="text-white font-medium">09:00 - 21:00</span></li>
+            <h4 className="text-white text-base font-bold mb-4">Jam Operasional</h4>
+            <ul className="space-y-3 text-sm">
+              <li className="flex flex-col gap-0.5">
+                <span className="text-slate-500 text-xs">Hari Kerja</span> 
+                <span className="text-white font-medium">{jamOperasional.weekday}</span>
+              </li>
+              <li className="flex flex-col gap-0.5">
+                <span className="text-slate-500 text-xs">Akhir Pekan</span> 
+                <span className="text-white font-medium">{jamOperasional.weekend}</span>
+              </li>
             </ul>
           </div>
           <div>
-            <h4 className="text-white text-lg font-bold mb-6">Kontak Kami</h4>
-            <ul className="space-y-4 text-sm">
-              <li className="flex items-start gap-3">
-                <span className="text-tosca-500 mt-1">📍</span> 
-                <span>Jl. A. P. Pettarani,<br/>Barru, Sulawesi Selatan</span>
+            <h4 className="text-white text-base font-bold mb-4">Kontak Kami</h4>
+            <ul className="space-y-3 text-sm">
+              <li className="flex items-start gap-2">
+                <MapPin size={16} className="text-slate-400 mt-0.5 shrink-0" />
+                <span>{alamatApotek}</span>
               </li>
-              <li className="flex items-center gap-3">
-                <span className="text-tosca-500">📞</span> 
-                <span>0812-3456-7890</span>
+              <li className="flex items-center gap-2">
+                <Phone size={16} className="text-slate-400 shrink-0" />
+                <span>{telpNumber}</span>
               </li>
-              <li className="flex items-center gap-3">
-                <span className="text-tosca-500">✉️</span> 
-                <span>info@apotek.com</span>
+              <li className="flex items-center gap-2">
+                <Mail size={16} className="text-slate-400 shrink-0" />
+                <span>{emailApotek}</span>
               </li>
             </ul>
           </div>
         </div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-16 pt-8 border-t border-slate-800/50 flex flex-col md:flex-row justify-between items-center gap-4 text-sm">
-          <p>&copy; {new Date().getFullYear()} Apotek. All rights reserved.</p>
-          <div className="flex gap-6">
-            <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
-          </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-8 border-t border-slate-800/50 flex flex-col md:flex-row justify-between items-center gap-4 text-xs">
+          <p>&copy; {new Date().getFullYear()} {namaApotek}. All rights reserved.</p>
         </div>
       </footer>
     </div>

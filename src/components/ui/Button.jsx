@@ -1,4 +1,3 @@
-import React from 'react';
 import { cn } from '../../utils';
 
 export function Button({ className, variant = 'primary', size = 'default', children, ...props }) {

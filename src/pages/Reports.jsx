@@ -1,197 +1,375 @@
-import React, { useState, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
-import { Calendar, Download, FileText, CheckCircle2 } from 'lucide-react';
-import { Button } from '../components/ui/Button';
+import { useState, useMemo } from 'react';
+import { Calendar, Download, FileText, TrendingUp, ShoppingBag, Truck, Building2, DollarSign, CheckCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import {
+  formatRupiah,
+  formatDateTime,
+  isSameDayInTimezone,
+  isWithinPastDaysInTimezone,
+  isSameMonthInTimezone,
+  isSameYearInTimezone
+} from '../utils';
 
-export function Reports({ transactions }) {
+const PERIOD_OPTIONS = [
+  { id: 'Daily',   label: 'Harian (Hari Ini)' },
+  { id: 'Weekly',  label: 'Mingguan (7 Hari)' },
+  { id: 'Monthly', label: 'Bulanan (Bulan Ini)' },
+  { id: 'Yearly',  label: 'Tahunan (Tahun Ini)' },
+];
+
+export function Reports({ transactions = [], incomingGoods = [], settings }) {
   const [filter, setFilter] = useState('Daily');
-
-  const formatRupiah = (number) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(number);
-  };
+  const [reportView, setReportView] = useState('sales');
+  const tz = settings?.timezone || 'Asia/Makassar';
 
   const filteredTransactions = useMemo(() => {
-    const today = new Date();
+    const now = new Date();
     return transactions.filter(t => {
-      const txDate = new Date(t.date);
-      if (filter === 'Daily') {
-        return txDate.toDateString() === today.toDateString();
-      } else if (filter === 'Weekly') {
-        const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-        return txDate >= weekAgo;
-      } else if (filter === 'Monthly') {
-        return txDate.getMonth() === today.getMonth() && txDate.getFullYear() === today.getFullYear();
-      } else if (filter === 'Yearly') {
-        return txDate.getFullYear() === today.getFullYear();
-      }
+      if (filter === 'Daily')   return isSameDayInTimezone(t.date, now, tz);
+      if (filter === 'Weekly')  return isWithinPastDaysInTimezone(t.date, 7, now);
+      if (filter === 'Monthly') return isSameMonthInTimezone(t.date, now, tz);
+      if (filter === 'Yearly')  return isSameYearInTimezone(t.date, now, tz);
       return true;
     });
-  }, [transactions, filter]);
+  }, [transactions, filter, tz]);
 
-  const totalRevenue = filteredTransactions.reduce((acc, t) => acc + t.total, 0);
+  const filteredIncomingGoods = useMemo(() => {
+    const now = new Date();
+    return incomingGoods.filter(g => {
+      if (filter === 'Daily')   return isSameDayInTimezone(g.date, now, tz);
+      if (filter === 'Weekly')  return isWithinPastDaysInTimezone(g.date, 7, now);
+      if (filter === 'Monthly') return isSameMonthInTimezone(g.date, now, tz);
+      if (filter === 'Yearly')  return isSameYearInTimezone(g.date, now, tz);
+      return true;
+    });
+  }, [incomingGoods, filter, tz]);
+
+  const totalRevenue = useMemo(() => filteredTransactions.reduce((s, t) => s + (t.total || 0), 0), [filteredTransactions]);
+  const totalHPP = useMemo(() => filteredTransactions.reduce((s, t) => {
+    if (t.total_hpp !== undefined) return s + t.total_hpp;
+    if (Array.isArray(t.items)) return s + t.items.reduce((ss, i) => ss + ((i.buy_price || 0) * (i.qty || 1)), 0);
+    return s;
+  }, 0), [filteredTransactions]);
+  const totalProfit = totalRevenue - totalHPP;
+  const marginPct = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : '0.0';
+  const totalIncomingPurchases = useMemo(() => filteredIncomingGoods.reduce((s, g) => s + (g.total_amount || 0), 0), [filteredIncomingGoods]);
 
   const handleExportPDF = () => {
     try {
       const doc = new jsPDF();
-      
+      const apotekName = settings?.nama_apotek || 'Apotek Medika Sejahtera';
+      const apotekAddress = settings?.alamat || 'Jl. Kesehatan Raya No. 88, Kemang, Jakarta Selatan';
+      const periodeLabel = PERIOD_OPTIONS.find(p => p.id === filter)?.label || filter;
+
       // Header
-      doc.setFontSize(22);
-      doc.setTextColor(20, 184, 166); // Tosca color
-      doc.text("E - Apotek", 14, 22);
-      
-      doc.setFontSize(12);
-      doc.setTextColor(100);
-      doc.text("Laporan Penjualan Transaksi Resmi", 14, 30);
-      
-      const periodeMap = {
-        'Daily': 'Harian',
-        'Weekly': 'Mingguan',
-        'Monthly': 'Bulanan',
-        'Yearly': 'Tahunan'
-      };
-      doc.text(`Periode: ${periodeMap[filter]}`, 14, 38);
+      doc.setFontSize(16); doc.setTextColor(79, 70, 229);
+      doc.text(apotekName, 14, 16);
+      doc.setFontSize(8.5); doc.setTextColor(100);
+      doc.text(apotekAddress, 14, 22);
+      doc.text('Laporan Rekapitulasi Finansial & Keuntungan Bersih', 14, 27);
+      doc.text(`Periode: ${periodeLabel} (Zona Waktu: ${tz})`, 14, 32);
+      doc.text(`Dicetak: ${new Date().toLocaleString('id-ID', { timeZone: tz })}`, 14, 37);
 
-      // Table Data
-      const tableColumn = ["ID Transaksi", "Tanggal & Waktu", "Jumlah Item", "Total Nominal"];
-      const tableRows = [];
-
-      filteredTransactions.forEach(trx => {
-        const dateObj = new Date(trx.date);
-        const dateStr = `${dateObj.toLocaleDateString('id-ID')} - ${dateObj.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}`;
-        const totalItems = Array.isArray(trx.items) ? trx.items.reduce((acc, item) => acc + item.qty, 0) : trx.items;
-        const rowData = [
-          trx.id,
-          dateStr,
-          totalItems.toString(),
-          formatRupiah(trx.total)
-        ];
-        tableRows.push(rowData);
+      const tableRows = filteredTransactions.map(trx => {
+        const hppVal = trx.total_hpp !== undefined
+          ? trx.total_hpp
+          : (Array.isArray(trx.items) ? trx.items.reduce((s, i) => s + ((i.buy_price || 0) * (i.qty || 1)), 0) : 0);
+        const profitVal = trx.profit !== undefined ? trx.profit : (trx.total - hppVal);
+        const itemsStr = Array.isArray(trx.items) ? trx.items.map(i => `${i.name} (${i.qty}x)`).join(', ') : `${trx.items || 1} item`;
+        return [trx.id, formatDateTime(trx.date, tz), itemsStr, formatRupiah(hppVal), formatRupiah(trx.total), formatRupiah(profitVal)];
       });
 
-      // Generate Table
       autoTable(doc, {
-        head: [tableColumn],
+        head: [['ID Trx', 'Tanggal & Waktu', 'Item Terjual', 'HPP Modal', 'Total Omzet', 'Laba Bersih']],
         body: tableRows,
-        startY: 48,
+        startY: 42,
         theme: 'grid',
-        headStyles: { fillColor: [20, 184, 166], textColor: [255, 255, 255], fontStyle: 'bold' },
-        styles: { fontSize: 10, cellPadding: 5 },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-        foot: [["", "", "Total Pendapatan", formatRupiah(totalRevenue)]],
-        footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold', fontSize: 11 }
+        headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+        styles: { fontSize: 7.5, cellPadding: 3 },
+        alternateRowStyles: { fillColor: [248, 249, 252] },
+        foot: [['', '', 'TOTAL PERIODE', formatRupiah(totalHPP), formatRupiah(totalRevenue), formatRupiah(totalProfit)]],
+        footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold', fontSize: 8.5 },
       });
-
-      doc.save(`Laporan_Penjualan_${periodeMap[filter]}_Apotek.pdf`);
-    } catch (error) {
-      console.error("Gagal melakukan export PDF:", error);
-      alert("Maaf, terjadi kesalahan saat mengekspor PDF.");
+      doc.save(`Laporan_${filter}_${apotekName.replace(/\s+/g, '_')}.pdf`);
+    } catch (err) {
+      console.error('PDF export error:', err);
+      alert('Terjadi kesalahan saat ekspor PDF.');
     }
   };
 
   return (
-    <div className="space-y-8 animate-fade-in pb-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 32 }}>
+      {/* Page Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <h2 className="text-3xl font-black tracking-tight text-slate-900">Laporan Penjualan</h2>
-          <p className="text-slate-500 mt-1">Rekapitulasi riwayat transaksi dan ekspor data finansial.</p>
+          <h2 className="section-title">Laporan & Rekap Finansial</h2>
+          <p className="section-subtitle">Analisis omzet, HPP, dan keuntungan bersih apotek berdasarkan periode</p>
         </div>
-        <Button className="gap-2 shadow-sm whitespace-nowrap" onClick={handleExportPDF}>
-          <Download size={18} /> Ekspor PDF Laporan
-        </Button>
+        <button className="btn btn-primary" onClick={handleExportPDF}>
+          <Download size={15} /> Ekspor PDF
+        </button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-4">
-        <Card className="md:col-span-1 bg-white/50 backdrop-blur-sm shadow-sm border-slate-100">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-sm font-bold text-slate-500 uppercase tracking-wider">Filter Periode</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {['Daily', 'Weekly', 'Monthly', 'Yearly'].map(opt => (
-              <button
-                key={opt}
-                onClick={() => setFilter(opt)}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm transition-all duration-300 ${
-                  filter === opt 
-                    ? 'bg-tosca-50 text-tosca-700 font-bold border border-tosca-200 shadow-sm' 
-                    : 'text-slate-600 hover:bg-white hover:text-slate-900 hover:shadow-sm border border-transparent'
-                }`}
-              >
-                <span>
-                  {opt === 'Daily' ? 'Harian (Hari ini)' :
-                   opt === 'Weekly' ? 'Mingguan (7 Hari)' :
-                   opt === 'Monthly' ? 'Bulanan (Bulan ini)' : 'Tahunan (Tahun ini)'}
-                </span>
-                {filter === opt && <CheckCircle2 size={16} className="text-tosca-500" />}
-              </button>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card className="md:col-span-3 border-0 shadow-soft">
-          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100 bg-white rounded-t-2xl">
-            <CardTitle className="flex items-center gap-3 text-xl">
-              <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
-                <Calendar className="h-5 w-5" />
+      {/* Metric Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+        {[
+          {
+            label: 'Total Omzet Penjualan',
+            value: formatRupiah(totalRevenue),
+            sub: `${filteredTransactions.length} transaksi dicatat`,
+            icon: ShoppingBag,
+            iconBg: '#eff6ff', iconColor: '#1d4ed8',
+          },
+          {
+            label: 'Total HPP (Modal Pokok)',
+            value: formatRupiah(totalHPP),
+            sub: 'Harga beli obat yang terjual',
+            icon: DollarSign,
+            iconBg: '#fff7ed', iconColor: '#d97706',
+          },
+          {
+            label: 'Keuntungan Bersih (Laba)',
+            value: formatRupiah(totalProfit),
+            sub: `Margin: +${marginPct}% dari omzet`,
+            icon: TrendingUp,
+            iconBg: '#f0fdf4', iconColor: '#16a34a',
+            highlight: true,
+          },
+          {
+            label: 'Belanja Faktur Pengadaan',
+            value: formatRupiah(totalIncomingPurchases),
+            sub: `${filteredIncomingGoods.length} faktur barang masuk`,
+            icon: Truck,
+            iconBg: '#faf5ff', iconColor: '#7c3aed',
+          },
+        ].map((c, i) => {
+          const Icon = c.icon;
+          return (
+            <div key={i} className="stat-card" style={c.highlight ? { border: '1.5px solid #bbf7d0', background: '#fafffe' } : {}}>
+              <div className="icon-box" style={{ background: c.iconBg }}>
+                <Icon size={18} color={c.iconColor} />
               </div>
-              Data Transaksi {
-                filter === 'Daily' ? 'Harian' :
-                filter === 'Weekly' ? 'Mingguan' :
-                filter === 'Monthly' ? 'Bulanan' : 'Tahunan'
-              }
-            </CardTitle>
-            <div className="text-left sm:text-right bg-slate-50 p-3 rounded-xl border border-slate-100">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Pendapatan Periode</p>
-              <p className="text-2xl font-black text-tosca-600">{formatRupiah(totalRevenue)}</p>
+              <div>
+                <p style={{ fontSize: 11, fontWeight: 600, color: '#8e95a3', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>{c.label}</p>
+                <p style={{ fontSize: '1.4rem', fontWeight: 800, color: c.highlight ? '#16a34a' : '#1e2432', letterSpacing: '-0.03em', margin: '0 0 4px' }}>{c.value}</p>
+                <p style={{ fontSize: 11.5, color: '#9ca3af', margin: 0, fontWeight: 500 }}>{c.sub}</p>
+              </div>
             </div>
-          </CardHeader>
-          <CardContent className="pt-0 px-0">
-            <Table className="border-0">
-              <TableHeader>
-                <TableRow className="bg-slate-50/50">
-                  <TableHead className="pl-6">ID Transaksi</TableHead>
-                  <TableHead>Tanggal & Waktu</TableHead>
-                  <TableHead className="text-center">Jumlah Item</TableHead>
-                  <TableHead className="text-right pr-6">Total Nominal</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredTransactions.map((trx) => {
-                  const dateObj = new Date(trx.date);
-                  return (
-                    <TableRow key={trx.id} className="hover:bg-slate-50/80 transition-colors">
-                      <TableCell className="font-bold text-tosca-600 pl-6">{trx.id}</TableCell>
-                      <TableCell className="text-slate-600 font-medium">
-                        {dateObj.toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'})} <span className="text-slate-400 mx-1">•</span> {dateObj.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className="inline-flex items-center justify-center bg-slate-100 text-slate-700 min-w-[2rem] px-2 h-8 rounded-lg font-bold">
-                          {Array.isArray(trx.items) ? trx.items.reduce((acc, item) => acc + item.qty, 0) : trx.items}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right font-black text-slate-900 pr-6">{formatRupiah(trx.total)}</TableCell>
-                    </TableRow>
-                  )
-                })}
-                {filteredTransactions.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center py-16 text-slate-500">
-                      <div className="flex flex-col items-center justify-center">
-                        <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-                          <FileText size={32} className="text-slate-300" />
+          );
+        })}
+      </div>
+
+      {/* Layout: Sidebar + Table */}
+      <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 16 }}>
+        {/* Left panel */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Period filter */}
+          <div className="card" style={{ padding: 16 }}>
+            <p style={{ fontSize: 10.5, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>
+              Filter Periode
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {PERIOD_OPTIONS.map(opt => (
+                <button
+                  key={opt.id}
+                  onClick={() => setFilter(opt.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                    background: filter === opt.id ? '#eeefff' : 'transparent',
+                    border: `1.5px solid ${filter === opt.id ? '#c7d2fe' : 'transparent'}`,
+                    color: filter === opt.id ? '#4f46e5' : '#6b7280',
+                    fontSize: 12.5, fontWeight: filter === opt.id ? 700 : 500,
+                    fontFamily: 'inherit', transition: 'all 0.12s'
+                  }}
+                >
+                  {opt.label}
+                  {filter === opt.id && <CheckCircle size={13} />}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* View selector */}
+          <div className="card" style={{ padding: 16 }}>
+            <p style={{ fontSize: 10.5, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>
+              Tampilan Data
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <button
+                onClick={() => setReportView('sales')}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 7,
+                  padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                  background: reportView === 'sales' ? '#f0fdf4' : 'transparent',
+                  border: `1.5px solid ${reportView === 'sales' ? '#bbf7d0' : 'transparent'}`,
+                  color: reportView === 'sales' ? '#15803d' : '#6b7280',
+                  fontSize: 12.5, fontWeight: reportView === 'sales' ? 700 : 500,
+                  fontFamily: 'inherit', transition: 'all 0.12s'
+                }}
+              >
+                <TrendingUp size={13} /> Penjualan & Laba
+              </button>
+              <button
+                onClick={() => setReportView('purchases')}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 7,
+                  padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                  background: reportView === 'purchases' ? '#faf5ff' : 'transparent',
+                  border: `1.5px solid ${reportView === 'purchases' ? '#e9d5ff' : 'transparent'}`,
+                  color: reportView === 'purchases' ? '#7c3aed' : '#6b7280',
+                  fontSize: 12.5, fontWeight: reportView === 'purchases' ? 700 : 500,
+                  fontFamily: 'inherit', transition: 'all 0.12s'
+                }}
+              >
+                <Truck size={13} /> Barang Masuk PT
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Data Table */}
+        <div className="card" style={{ overflow: 'hidden' }}>
+          {/* Table Header */}
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid #f0f1f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {reportView === 'sales' ? (
+                <>
+                  <div className="icon-box-sm" style={{ background: '#f0fdf4' }}><Calendar size={14} color="#16a34a" /></div>
+                  <div>
+                    <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e2432', margin: 0 }}>Rekapitulasi Penjualan & Laba</h3>
+                    <p style={{ fontSize: 11.5, color: '#9ca3af', margin: 0 }}>Periode: {PERIOD_OPTIONS.find(p => p.id === filter)?.label}</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="icon-box-sm" style={{ background: '#faf5ff' }}><Truck size={14} color="#7c3aed" /></div>
+                  <div>
+                    <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e2432', margin: 0 }}>Faktur Pengadaan dari PT/PBF</h3>
+                    <p style={{ fontSize: 11.5, color: '#9ca3af', margin: 0 }}>Periode: {PERIOD_OPTIONS.find(p => p.id === filter)?.label}</p>
+                  </div>
+                </>
+              )}
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ fontSize: 10.5, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 2px' }}>
+                {reportView === 'sales' ? 'Laba Bersih Periode' : 'Total Belanja PT'}
+              </p>
+              <p style={{ fontSize: '1rem', fontWeight: 800, color: reportView === 'sales' ? '#16a34a' : '#7c3aed', margin: 0 }}>
+                {reportView === 'sales' ? formatRupiah(totalProfit) : formatRupiah(totalIncomingPurchases)}
+              </p>
+            </div>
+          </div>
+
+          {/* Table Content */}
+          <div style={{ overflowX: 'auto' }}>
+            {reportView === 'sales' ? (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th style={{ paddingLeft: 20 }}>ID Transaksi</th>
+                    <th>Waktu</th>
+                    <th>Item Obat Terjual</th>
+                    <th className="text-right">HPP (Modal)</th>
+                    <th className="text-right">Total Omzet</th>
+                    <th className="text-right" style={{ paddingRight: 20 }}>Laba Bersih</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTransactions.map(trx => {
+                    const hppVal = trx.total_hpp !== undefined
+                      ? trx.total_hpp
+                      : (Array.isArray(trx.items) ? trx.items.reduce((s, i) => s + ((i.buy_price || 0) * (i.qty || 1)), 0) : 0);
+                    const profitVal = trx.profit !== undefined ? trx.profit : (trx.total - hppVal);
+                    return (
+                      <tr key={trx.id}>
+                        <td style={{ paddingLeft: 20, fontWeight: 700, color: '#4f46e5', fontSize: 12 }}>{trx.id}</td>
+                        <td style={{ color: '#6b7280', fontSize: 12 }}>{formatDateTime(trx.date, tz)}</td>
+                        <td>
+                          {Array.isArray(trx.items) ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              {trx.items.map((it, idx) => (
+                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                                  <span style={{ fontWeight: 500, color: '#374151' }}>{it.name}</span>
+                                  <span className="badge badge-gray" style={{ fontSize: 10 }}>×{it.qty}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: 12, color: '#6b7280' }}>{trx.items || 1} item</span>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'right', color: '#6b7280' }}>{formatRupiah(hppVal)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700, color: '#1e2432' }}>{formatRupiah(trx.total)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 800, color: '#16a34a', paddingRight: 20 }}>+{formatRupiah(profitVal)}</td>
+                      </tr>
+                    );
+                  })}
+                  {filteredTransactions.length === 0 && (
+                    <tr>
+                      <td colSpan={6}>
+                        <div className="empty-state">
+                          <div className="empty-state-icon"><FileText size={22} /></div>
+                          <h4>Belum ada transaksi</h4>
+                          <p>Belum ada transaksi penjualan tercatat untuk periode ini</p>
                         </div>
-                        <p className="text-lg font-semibold text-slate-700">Tidak ada transaksi</p>
-                        <p className="text-sm">Belum ada transaksi yang tercatat untuk periode ini.</p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            ) : (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th style={{ paddingLeft: 20 }}>No. Faktur</th>
+                    <th>Distributor (PT / PBF)</th>
+                    <th>Tanggal Masuk</th>
+                    <th>Obat & Kuantitas</th>
+                    <th className="text-right" style={{ paddingRight: 20 }}>Total Nilai Faktur</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredIncomingGoods.map(inv => (
+                    <tr key={inv.id}>
+                      <td style={{ paddingLeft: 20, fontWeight: 700, color: '#7c3aed', fontSize: 12 }}>{inv.invoice_number}</td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}>
+                          <Building2 size={13} color="#9ca3af" />
+                          <span style={{ fontWeight: 600, color: '#374151' }}>{inv.supplier_name}</span>
+                        </div>
+                      </td>
+                      <td style={{ fontSize: 12, color: '#6b7280' }}>{formatDateTime(inv.date, tz)}</td>
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          {inv.items.map((it, idx) => (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                              <span style={{ color: '#374151', fontWeight: 500 }}>{it.productName}</span>
+                              <span className="badge badge-green" style={{ fontSize: 10 }}>+{it.qty} unit</span>
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 800, color: '#1e2432', paddingRight: 20 }}>{formatRupiah(inv.total_amount)}</td>
+                    </tr>
+                  ))}
+                  {filteredIncomingGoods.length === 0 && (
+                    <tr>
+                      <td colSpan={5}>
+                        <div className="empty-state">
+                          <div className="empty-state-icon"><Truck size={22} /></div>
+                          <h4>Belum ada faktur masuk</h4>
+                          <p>Belum ada penerimaan faktur dari PT pada periode ini</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
