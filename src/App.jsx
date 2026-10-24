@@ -66,9 +66,40 @@ function MainApp() {
     storage.setShifts(shifts);
   }, [shifts]);
 
+  // Multi-tab synchronization
   useEffect(() => {
-    storage.setActiveShift(activeShift);
-  }, [activeShift]);
+    const handleStorageChange = (e) => {
+      if (!e.key) {
+        // If storage was cleared
+        setProducts(storage.getProducts());
+        setTransactions(storage.getTransactions());
+        setIncomingGoods(storage.getIncomingGoods());
+        setUsers(storage.getUsers());
+        setShifts(storage.getShifts());
+        setActiveShift(storage.getActiveShift());
+        return;
+      }
+      try {
+        if (e.key === 'apotek_products_v3') setProducts(JSON.parse(e.newValue));
+        if (e.key === 'apotek_transactions_v3') setTransactions(JSON.parse(e.newValue));
+        if (e.key === 'apotek_incoming_v3') setIncomingGoods(JSON.parse(e.newValue));
+        if (e.key === 'apotek_users_list_v3') setUsers(JSON.parse(e.newValue));
+        if (e.key === 'apotek_shifts_v3') setShifts(JSON.parse(e.newValue));
+        if (e.key === 'apotek_active_shift_v3') setActiveShift(JSON.parse(e.newValue));
+      } catch (err) {
+        console.warn('Sync error from storage event:', err);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  const handleResetDemoData = () => {
+    if (window.confirm('Reset semua data ke konfigurasi demo awal? Semua transaksi uji coba dan stok akan dikembalikan ke kondisi default.')) {
+      storage.resetToDefault();
+    }
+  };
 
   const handleLoginSuccess = (user) => {
     setCurrentUser(user);
@@ -192,6 +223,7 @@ function MainApp() {
                 onOpenShiftModal={() => setIsOpenShiftModalOpen(true)}
                 onCloseShiftModal={() => setIsCloseShiftModalOpen(true)}
                 onLogout={handleLogout}
+                onResetDemo={handleResetDemoData}
               >
                 <Dashboard 
                   products={products} 
@@ -217,6 +249,7 @@ function MainApp() {
                 onOpenShiftModal={() => setIsOpenShiftModalOpen(true)}
                 onCloseShiftModal={() => setIsCloseShiftModalOpen(true)}
                 onLogout={handleLogout}
+                onResetDemo={handleResetDemoData}
               >
                 <Inventory 
                   products={products} 
@@ -245,6 +278,7 @@ function MainApp() {
                 onOpenShiftModal={() => setIsOpenShiftModalOpen(true)}
                 onCloseShiftModal={() => setIsCloseShiftModalOpen(true)}
                 onLogout={handleLogout}
+                onResetDemo={handleResetDemoData}
               >
                 <POS 
                   products={products} 
@@ -274,6 +308,7 @@ function MainApp() {
                 onOpenShiftModal={() => setIsOpenShiftModalOpen(true)}
                 onCloseShiftModal={() => setIsCloseShiftModalOpen(true)}
                 onLogout={handleLogout}
+                onResetDemo={handleResetDemoData}
               >
                 <Reports 
                   transactions={transactions} 
@@ -298,6 +333,7 @@ function MainApp() {
                 onOpenShiftModal={() => setIsOpenShiftModalOpen(true)}
                 onCloseShiftModal={() => setIsCloseShiftModalOpen(true)}
                 onLogout={handleLogout}
+                onResetDemo={handleResetDemoData}
               >
                 <ShiftHistory 
                   shifts={shifts}
@@ -325,6 +361,7 @@ function MainApp() {
                 onOpenShiftModal={() => setIsOpenShiftModalOpen(true)}
                 onCloseShiftModal={() => setIsCloseShiftModalOpen(true)}
                 onLogout={handleLogout}
+                onResetDemo={handleResetDemoData}
               >
                 <StaffManagement 
                   users={users}

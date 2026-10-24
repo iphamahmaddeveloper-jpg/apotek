@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, Search, Globe, AlertTriangle, X, Clock, LogOut } from 'lucide-react';
+import { Bell, Search, Globe, AlertTriangle, X, Clock, LogOut, RotateCcw } from 'lucide-react';
 import { formatHeaderDate } from '../../utils';
 import { ROLES } from '../../config/auth';
 import { PWAInstallButton } from '../pwa/InstallPrompt';
@@ -12,7 +12,8 @@ export function Header({
   activeShift, 
   onOpenShiftModal, 
   onCloseShiftModal, 
-  onLogout 
+  onLogout,
+  onResetDemo 
 }) {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
@@ -91,6 +92,20 @@ export function Header({
           <span>Toko Publik</span>
         </button>
       </Link>
+
+      {/* Reset Demo Button */}
+      {onResetDemo && (
+        <button
+          type="button"
+          onClick={onResetDemo}
+          className="btn btn-secondary btn-sm hide-on-mobile"
+          style={{ gap: 6, color: '#dc2626', borderColor: '#fee2e2', background: '#fef2f2' }}
+          title="Kembalikan semua data ke kondisi default demo"
+        >
+          <RotateCcw size={13} />
+          <span>Reset Demo</span>
+        </button>
+      )}
 
       {/* PWA Install Button */}
       <div className="hide-on-mobile">

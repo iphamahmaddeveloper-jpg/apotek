@@ -9,7 +9,8 @@ export function Layout({
   activeShift, 
   onOpenShiftModal, 
   onCloseShiftModal, 
-  onLogout 
+  onLogout,
+  onResetDemo 
 }) {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f5f6fa' }}>
@@ -28,6 +29,7 @@ export function Layout({
           onOpenShiftModal={onOpenShiftModal} 
           onCloseShiftModal={onCloseShiftModal} 
           onLogout={onLogout} 
+          onResetDemo={onResetDemo}
         />
         <main className="page-container animate-fade-in">
           {children}
