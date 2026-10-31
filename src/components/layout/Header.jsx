@@ -28,8 +28,6 @@ export function Header({
   const navLinks = [
     ...(isOwner ? [{ to: '/admin/dashboard', label: 'Dashboard' }] : []),
     { to: '/admin/inventory', label: 'Inventori' },
-    { to: '/admin/inventory?tab=incoming', label: 'Pembelian PBF' },
-    { to: '/admin/inventory?tab=opname', label: 'Stok Opname' },
     { to: '/admin/reports', label: 'Laporan & Void' },
     { to: '/admin/shifts', label: 'Shift & Kas' },
     ...(isOwner ? [{ to: '/admin/staff', label: 'Karyawan' }] : [])
@@ -480,6 +478,25 @@ export function Header({
           )}
 
           <NavLink
+            to="/admin/inventory"
+            onClick={() => setShowMobileNav(false)}
+            style={({ isActive }) => ({
+              padding: '10px 16px',
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: isActive ? 800 : 600,
+              color: isActive ? '#047857' : '#334155',
+              background: isActive ? '#ecfdf5' : '#f8fafc',
+              textDecoration: 'none',
+              minHeight: 42,
+              display: 'flex',
+              alignItems: 'center'
+            })}
+          >
+            📦 Inventori (Katalog, Pembelian PBF & SO)
+          </NavLink>
+
+          <NavLink
             to="/admin/reports"
             onClick={() => setShowMobileNav(false)}
             style={({ isActive }) => ({
@@ -495,103 +512,26 @@ export function Header({
               alignItems: 'center'
             })}
           >
-            3. Laporan Penjualan Obat
+            📊 Laporan Penjualan & Batal Faktur (Void)
           </NavLink>
 
           <NavLink
-            to="/admin/reports"
+            to="/admin/shifts"
             onClick={() => setShowMobileNav(false)}
-            style={{
+            style={({ isActive }) => ({
               padding: '10px 16px',
               borderRadius: 12,
               fontSize: 13,
-              fontWeight: 600,
-              color: '#b91c1c',
-              background: '#fff5f5',
-              textDecoration: 'none',
-              minHeight: 42,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6
-            }}
-          >
-            <span>4. Hapus / Batal Penjualan (Void)</span>
-          </NavLink>
-
-          <NavLink
-            to="/admin/inventory?tab=incoming"
-            onClick={() => setShowMobileNav(false)}
-            style={{
-              padding: '10px 16px',
-              borderRadius: 12,
-              fontSize: 13,
-              fontWeight: 600,
-              color: '#334155',
-              background: '#f8fafc',
+              fontWeight: isActive ? 800 : 600,
+              color: isActive ? '#047857' : '#334155',
+              background: isActive ? '#ecfdf5' : '#f8fafc',
               textDecoration: 'none',
               minHeight: 42,
               display: 'flex',
               alignItems: 'center'
-            }}
+            })}
           >
-            5. Pembelian Obat (Faktur Masuk PBF)
-          </NavLink>
-
-          <NavLink
-            to="/admin/inventory?tab=opname"
-            onClick={() => setShowMobileNav(false)}
-            style={{
-              padding: '10px 16px',
-              borderRadius: 12,
-              fontSize: 13,
-              fontWeight: 600,
-              color: '#334155',
-              background: '#f8fafc',
-              textDecoration: 'none',
-              minHeight: 42,
-              display: 'flex',
-              alignItems: 'center'
-            }}
-          >
-            6. Stok Opname (Cek Fisik per Rak)
-          </NavLink>
-
-          <NavLink
-            to="/admin/inventory?tab=opname"
-            onClick={() => setShowMobileNav(false)}
-            style={{
-              padding: '10px 16px',
-              borderRadius: 12,
-              fontSize: 13,
-              fontWeight: 600,
-              color: '#334155',
-              background: '#f8fafc',
-              textDecoration: 'none',
-              minHeight: 42,
-              display: 'flex',
-              alignItems: 'center'
-            }}
-          >
-            7. Laporan Stok Opname (Lap SO)
-          </NavLink>
-
-          <NavLink
-            to="/admin/inventory"
-            onClick={() => setShowMobileNav(false)}
-            style={{
-              padding: '10px 16px',
-              borderRadius: 12,
-              fontSize: 13,
-              fontWeight: 600,
-              color: '#334155',
-              background: '#f8fafc',
-              textDecoration: 'none',
-              minHeight: 42,
-              display: 'flex',
-              alignItems: 'center'
-            }}
-          >
-            8. Katalog Obat & Rak Apotek
+            🕒 Riwayat Shift & Kasir
           </NavLink>
 
           {isOwner && (

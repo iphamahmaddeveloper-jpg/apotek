@@ -2,23 +2,13 @@ import { useState, useMemo, useEffect } from 'react';
 import { 
   Search, Plus, Truck, Boxes, BarChart2, PackagePlus, 
   AlertCircle, Trash2, CheckCircle, Eye, EyeOff, Info, X,
-  Barcode, Calendar, FileText, CheckCheck, RotateCcw, Building2
+  Barcode, Calendar, FileText, CheckCheck, RotateCcw, Building2,
+  Clock, DollarSign, ArrowUpRight, ShieldCheck, Tag
 } from 'lucide-react';
 import { formatRupiah, formatDateTime, getLocalDateString } from '../utils';
 import { useSearchParams } from 'react-router-dom';
 import { ROLES } from '../config/auth';
 import { useToast } from '../context/ToastContext';
-
-function SelectInput({ label, value, onChange, options }) {
-  return (
-    <div>
-      <label className="form-label">{label}</label>
-      <select className="form-input form-select" value={value} onChange={onChange} required>
-        {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-      </select>
-    </div>
-  );
-}
 
 export function Inventory({ 
   products = [], 
@@ -33,15 +23,26 @@ export function Inventory({
 }) {
   const toast = useToast();
   const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'inventory'); // 'inventory' | 'incoming' | 'opname'
+
+  // Tab 1 (Katalog Obat) state
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get('search') || '');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [filterStockStatus, setFilterStockStatus] = useState('ALL'); // 'ALL' | 'LOW'
   const [showFinancialColumns, setShowFinancialColumns] = useState(false);
-  const [showStaffGuide, setShowStaffGuide] = useState(() => !localStorage.getItem('hide_scenario_b_guide'));
-  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'inventory');
-  const tz = settings?.timezone || 'Asia/Makassar';
 
-  const isOwner = currentUser?.role === ROLES.OWNER;
+  // Tab 2 (Pembelian PBF) state
+  const [incomingSearch, setIncomingSearch] = useState('');
+  const [incomingSupplierFilter, setIncomingSupplierFilter] = useState('ALL');
+  const [incomingPaymentFilter, setIncomingPaymentFilter] = useState('ALL'); // 'ALL' | 'HUTANG' | 'TUNAI'
+
+  // Tab 3 (Stok Opname) state
+  const [opnameSubTab, setOpnameSubTab] = useState('active_so'); // 'active_so' | 'so_history'
+  const [opnameRackFilter, setOpnameRackFilter] = useState('ALL');
+  const [opnameStatusFilter, setOpnameStatusFilter] = useState('ALL'); // 'ALL' | 'PENDING' | 'DONE' | 'DIFF'
+  const [opnameSearch, setOpnameSearch] = useState('');
+  const [physicalCounts, setPhysicalCounts] = useState({}); // { [productId]: number }
+  const [opnameNotes, setOpnameNotes] = useState({}); // { [productId]: string }
 
   // Modal states
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -53,15 +54,10 @@ export function Inventory({
   const [quickStockAmt, setQuickStockAmt] = useState('');
   const [formError, setFormError] = useState('');
 
-  // Stok Opname State
-  const [opnameSubTab, setOpnameSubTab] = useState('active_so'); // 'active_so' | 'so_history'
-  const [opnameRackFilter, setOpnameRackFilter] = useState('ALL');
-  const [opnameStatusFilter, setOpnameStatusFilter] = useState('ALL'); // 'ALL' | 'PENDING' | 'DONE' | 'DIFF'
-  const [opnameSearch, setOpnameSearch] = useState('');
-  const [physicalCounts, setPhysicalCounts] = useState({}); // { [productId]: number }
-  const [opnameNotes, setOpnameNotes] = useState({}); // { [productId]: string }
+  const tz = settings?.timezone || 'Asia/Makassar';
+  const isOwner = currentUser?.role === ROLES.OWNER;
 
-  // Form state
+  // Form state Obat Baru
   const [pf, setPf] = useState({ 
     name: '', barcode: '', category: '', buy_price: '', price: '', stock: '', 
     min_stock: '10', unit: 'Strip', location: '', supplier: '', batch_no: '', exp_date: '' 
@@ -75,14 +71,14 @@ export function Inventory({
     date: getLocalDateString(), 
     payment_term: 'HUTANG', // 'HUTANG' | 'TUNAI'
     due_date: '',
-    status: 'VERIFIED', // 'VERIFIED' (langsung tambah stok) | 'DRAFT'
+    status: 'VERIFIED',
     notes: '',
     items: [
       { productId: '', barcode: '', qty: '10', unit: 'Strip', buy_price: '', batch_no: '', exp_date: '' }
     ]
   });
 
-  // Sinkronisasi tab dari query params
+  // Sinkronisasi tab dari URL
   useEffect(() => {
     const tabParam = searchParams.get('tab');
     if (tabParam && ['inventory', 'incoming', 'opname'].includes(tabParam)) {
@@ -114,6 +110,67 @@ export function Inventory({
     ];
     return Array.from(new Set([...base, ...products.map(p => p.supplier).filter(Boolean), ...incomingGoods.map(g => g.supplier_name).filter(Boolean)]));
   }, [settings, products, incomingGoods]);
+
+  // Stats Tab 1: Katalog
+  const lowStockCount = useMemo(() => products.filter(p => p.stock < (p.min_stock || 10)).length, [products]);
+  const totalUnits = useMemo(() => products.reduce((s, p) => s + (p.stock || 0), 0), [products]);
+
+  // Stats Tab 2: Pembelian PBF
+  const totalIncomingPurchases = useMemo(() => incomingGoods.reduce((s, g) => s + (g.total_amount || 0), 0), [incomingGoods]);
+  const hutangGoods = useMemo(() => incomingGoods.filter(g => g.payment_term === 'HUTANG'), [incomingGoods]);
+  const totalHutangAmount = useMemo(() => hutangGoods.reduce((s, g) => s + (g.total_amount || 0), 0), [hutangGoods]);
+  const lunasGoods = useMemo(() => incomingGoods.filter(g => g.payment_term !== 'HUTANG'), [incomingGoods]);
+  const totalLunasAmount = useMemo(() => lunasGoods.reduce((s, g) => s + (g.total_amount || 0), 0), [lunasGoods]);
+
+  // Stats Tab 3: Stok Opname
+  const opnameCheckedCount = useMemo(() => {
+    return Object.keys(physicalCounts).filter(k => physicalCounts[k] !== undefined && physicalCounts[k] !== '').length;
+  }, [physicalCounts]);
+
+  const discrepancyCount = useMemo(() => {
+    return Object.keys(physicalCounts).filter(k => {
+      const p = products.find(prod => prod.id === Number(k));
+      return p && physicalCounts[k] !== undefined && physicalCounts[k] !== '' && (parseInt(physicalCounts[k], 10) !== p.stock);
+    }).length;
+  }, [physicalCounts, products]);
+
+  // Filter List Tab 1
+  const filteredProducts = useMemo(() => products.filter(p => {
+    const q = searchTerm.toLowerCase().trim();
+    const matchSearch = !q || p.name.toLowerCase().includes(q) || (p.location || '').toLowerCase().includes(q) || (p.barcode || '').includes(q) || (p.supplier || '').toLowerCase().includes(q);
+    const matchCat = categoryFilter === 'All' || p.category === categoryFilter;
+    const matchStock = filterStockStatus === 'ALL' || (filterStockStatus === 'LOW' && p.stock < (p.min_stock || 10));
+    return matchSearch && matchCat && matchStock;
+  }), [products, searchTerm, categoryFilter, filterStockStatus]);
+
+  // Filter List Tab 2: Faktur Masuk PBF
+  const filteredIncomingGoods = useMemo(() => incomingGoods.filter(g => {
+    const q = incomingSearch.toLowerCase().trim();
+    const matchSearch = !q || (g.invoice_number || '').toLowerCase().includes(q) || (g.supplier_name || '').toLowerCase().includes(q);
+    const matchSupplier = incomingSupplierFilter === 'ALL' || g.supplier_name === incomingSupplierFilter;
+    const matchPayment = incomingPaymentFilter === 'ALL' || g.payment_term === incomingPaymentFilter;
+    return matchSearch && matchSupplier && matchPayment;
+  }), [incomingGoods, incomingSearch, incomingSupplierFilter, incomingPaymentFilter]);
+
+  // Filter List Tab 3: Stok Opname
+  const opnameFilteredProducts = useMemo(() => {
+    return products.filter(p => {
+      const q = opnameSearch.toLowerCase().trim();
+      const matchSearch = !q || p.name.toLowerCase().includes(q) || (p.barcode || '').includes(q) || (p.location || '').toLowerCase().includes(q);
+      const matchRack = opnameRackFilter === 'ALL' || p.location === opnameRackFilter;
+      
+      const counted = physicalCounts[p.id];
+      const hasCounted = counted !== undefined && counted !== '';
+      const diff = hasCounted ? (parseInt(counted, 10) - p.stock) : 0;
+
+      let matchStatus = true;
+      if (opnameStatusFilter === 'PENDING') matchStatus = !hasCounted;
+      if (opnameStatusFilter === 'DONE') matchStatus = hasCounted;
+      if (opnameStatusFilter === 'DIFF') matchStatus = hasCounted && diff !== 0;
+
+      return matchSearch && matchRack && matchStatus;
+    });
+  }, [products, opnameSearch, opnameRackFilter, opnameStatusFilter, physicalCounts]);
 
   const openAdd = () => {
     if (!isOwner) {
@@ -217,8 +274,10 @@ export function Inventory({
 
     if (isEditMode && editingProduct) {
       onEditProduct({ ...editingProduct, ...prodData });
+      toast.success(`Data obat ${prodData.name} berhasil diperbarui.`);
     } else {
       onAddProduct({ id: Date.now(), ...prodData });
+      toast.success(`Obat ${prodData.name} berhasil ditambahkan ke katalog.`);
     }
     closeAll();
   };
@@ -315,7 +374,7 @@ export function Inventory({
     };
 
     if (onAddIncomingGoods) onAddIncomingGoods(newData);
-    toast.success(`Faktur ${newData.invoice_number} berhasil disimpan! ${incomingTotalUnits} unit obat langsung bertambah di inventori apotek.`);
+    toast.success(`Faktur ${newData.invoice_number} berhasil disimpan! ${incomingTotalUnits} unit obat langsung bertambah di inventori.`);
     closeAll();
   };
 
@@ -348,102 +407,247 @@ export function Inventory({
     }
   };
 
-  const filteredProducts = useMemo(() => products.filter(p => {
-    const q = searchTerm.toLowerCase();
-    const matchSearch = p.name.toLowerCase().includes(q) || (p.location || '').toLowerCase().includes(q) || (p.barcode || '').includes(q) || (p.supplier || '').toLowerCase().includes(q);
-    const matchCat = categoryFilter === 'All' || p.category === categoryFilter;
-    const matchStock = filterStockStatus === 'ALL' || (filterStockStatus === 'LOW' && p.stock < (p.min_stock || 10));
-    return matchSearch && matchCat && matchStock;
-  }), [products, searchTerm, categoryFilter, filterStockStatus]);
-
-  // Filter khusus untuk lembar Stok Opname
-  const opnameFilteredProducts = useMemo(() => {
-    return products.filter(p => {
-      const q = opnameSearch.toLowerCase().trim();
-      const matchSearch = !q || p.name.toLowerCase().includes(q) || (p.barcode || '').includes(q) || (p.location || '').toLowerCase().includes(q);
-      const matchRack = opnameRackFilter === 'ALL' || p.location === opnameRackFilter;
-      
-      const counted = physicalCounts[p.id];
-      const hasCounted = counted !== undefined && counted !== '';
-      const diff = hasCounted ? (parseInt(counted, 10) - p.stock) : 0;
-
-      let matchStatus = true;
-      if (opnameStatusFilter === 'PENDING') matchStatus = !hasCounted;
-      if (opnameStatusFilter === 'DONE') matchStatus = hasCounted;
-      if (opnameStatusFilter === 'DIFF') matchStatus = hasCounted && diff !== 0;
-
-      return matchSearch && matchRack && matchStatus;
-    });
-  }, [products, opnameSearch, opnameRackFilter, opnameStatusFilter, physicalCounts]);
-
-  const lowStockCount = useMemo(() => products.filter(p => p.stock < (p.min_stock || 10)).length, [products]);
-  const totalAsset = useMemo(() => products.reduce((s, p) => s + (p.buy_price || 0) * (p.stock || 0), 0), [products]);
-  const totalPotential = useMemo(() => products.reduce((s, p) => s + (p.price || 0) * (p.stock || 0), 0), [products]);
-  const totalUnits = useMemo(() => products.reduce((s, p) => s + (p.stock || 0), 0), [products]);
-
   return (
-    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Page Header */}
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      {/* ── HEADER DINAMIS SESUAI FITUR AKTIF ── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <h2 className="section-title">Inventaris, Pembelian & Stok Opname</h2>
+          <h2 className="section-title">
+            {activeTab === 'inventory' && 'Katalog & Stok Obat Apotek'}
+            {activeTab === 'incoming' && 'Pembelian Obat & Faktur Masuk (PBF)'}
+            {activeTab === 'opname' && 'Stok Opname & Audit Fisik Lemari Rak'}
+          </h2>
           <p className="section-subtitle">
-            {isOwner 
-              ? 'Kelola katalog obat, posisi rak, faktur pengadaan PT/PBF, dan rekonsiliasi stok opname apotek' 
-              : 'Cek stok obat di apotek, posisi rak, terima obat dari kurir, dan cek fisik stok opname'
-            }
+            {activeTab === 'inventory' && 'Data master obat, sisa stok unit fisik di apotek, posisi rak, dan harga jual kasir'}
+            {activeTab === 'incoming' && 'Penerimaan faktur dari distributor PBF (PT. BINAYA dll), tagihan hutang tempo, dan verifikasi barang masuk'}
+            {activeTab === 'opname' && 'Audit perbandingan stok sistem komputer vs hitungan fisik lemari rak apotek, serta arsip Lap SO'}
           </p>
         </div>
 
-        {/* Action Buttons Header */}
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button 
-            type="button" 
-            className="btn btn-secondary" 
-            onClick={openIncoming}
-            style={{ borderRadius: 9, gap: 6, fontWeight: 700 }}
-          >
-            <Truck size={15} color="#059669" />
-            <span>+ Input Faktur Masuk (PBF)</span>
-          </button>
-
-          {isOwner && (
+        {/* Action Button Khusus Fitur Aktif */}
+        <div>
+          {activeTab === 'inventory' && isOwner && (
             <button 
               type="button" 
               className="btn btn-primary" 
               onClick={openAdd}
-              style={{ background: 'linear-gradient(135deg, #059669 0%, #0d9488 100%)', borderRadius: 9, gap: 6 }}
+              style={{ background: 'linear-gradient(135deg, #059669 0%, #0d9488 100%)', borderRadius: 10, gap: 6 }}
             >
               <Plus size={16} />
               <span>+ Daftarkan Obat Baru</span>
             </button>
           )}
+
+          {activeTab === 'incoming' && (
+            <button 
+              type="button" 
+              className="btn btn-primary" 
+              onClick={openIncoming}
+              style={{ background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', borderRadius: 10, gap: 6 }}
+            >
+              <Truck size={16} />
+              <span>+ Input Faktur Pembelian PBF</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Modern Top Tabs */}
-      <div className="tab-list">
-        {[
-          { key: 'inventory', label: '1. Daftar Obat & Posisi Rak', count: products.length, icon: Boxes },
-          { key: 'incoming',  label: '2. Pembelian Obat (Faktur PBF)', count: incomingGoods.length, icon: Truck },
-          { key: 'opname',    label: '3. Stok Opname & Cek Fisik', count: null, icon: BarChart2 },
-        ].map(tab => {
-          const Icon = tab.icon;
-          return (
-            <button 
-              key={tab.key} 
-              className={`tab-item ${activeTab === tab.key ? 'active' : ''}`} 
-              onClick={() => setActiveTab(tab.key)}
-            >
-              <Icon size={15} />
-              {tab.label}
-              {tab.count !== null && <span className="tab-count">{tab.count}</span>}
-            </button>
-          );
-        })}
+      {/* ── 3 FITUR UTAMA INVENTORI (SWITCHER BESAR, JELAS, DAN KONTRAS) ── */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+        gap: 12,
+        background: '#f8fafc',
+        padding: 8,
+        borderRadius: 18,
+        border: '1.5px solid #e2e8f0'
+      }}>
+        {/* FITUR 1: KATALOG OBAT */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('inventory')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            padding: '12px 16px',
+            borderRadius: 14,
+            background: activeTab === 'inventory' ? '#ffffff' : 'transparent',
+            border: activeTab === 'inventory' ? '2px solid #059669' : '2px solid transparent',
+            boxShadow: activeTab === 'inventory' ? '0 4px 14px rgba(5, 150, 105, 0.15)' : 'none',
+            cursor: 'pointer',
+            textAlign: 'left',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <div style={{
+            width: 42,
+            height: 42,
+            borderRadius: 10,
+            background: activeTab === 'inventory' ? '#ecfdf5' : '#f1f5f9',
+            color: activeTab === 'inventory' ? '#059669' : '#64748b',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <Boxes size={22} />
+          </div>
+          <div>
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: activeTab === 'inventory' ? '#0f172a' : '#475569' }}>
+              1. Katalog & Stok Obat
+            </div>
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>
+              Master obat, posisi rak & harga jual ({products.length} obat)
+            </div>
+          </div>
+        </button>
+
+        {/* FITUR 2: PEMBELIAN OBAT PBF */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('incoming')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            padding: '12px 16px',
+            borderRadius: 14,
+            background: activeTab === 'incoming' ? '#ffffff' : 'transparent',
+            border: activeTab === 'incoming' ? '2px solid #0284c7' : '2px solid transparent',
+            boxShadow: activeTab === 'incoming' ? '0 4px 14px rgba(2, 132, 199, 0.15)' : 'none',
+            cursor: 'pointer',
+            textAlign: 'left',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <div style={{
+            width: 42,
+            height: 42,
+            borderRadius: 10,
+            background: activeTab === 'incoming' ? '#f0f9ff' : '#f1f5f9',
+            color: activeTab === 'incoming' ? '#0284c7' : '#64748b',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <Truck size={22} />
+          </div>
+          <div>
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: activeTab === 'incoming' ? '#0f172a' : '#475569' }}>
+              2. Pembelian Obat (PBF)
+            </div>
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>
+              Faktur PT. BINAYA, hutang tempo ({incomingGoods.length} faktur)
+            </div>
+          </div>
+        </button>
+
+        {/* FITUR 3: STOK OPNAME */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('opname')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            padding: '12px 16px',
+            borderRadius: 14,
+            background: activeTab === 'opname' ? '#ffffff' : 'transparent',
+            border: activeTab === 'opname' ? '2px solid #d97706' : '2px solid transparent',
+            boxShadow: activeTab === 'opname' ? '0 4px 14px rgba(217, 119, 6, 0.15)' : 'none',
+            cursor: 'pointer',
+            textAlign: 'left',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <div style={{
+            width: 42,
+            height: 42,
+            borderRadius: 10,
+            background: activeTab === 'opname' ? '#fffbeb' : '#f1f5f9',
+            color: activeTab === 'opname' ? '#d97706' : '#64748b',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <BarChart2 size={22} />
+          </div>
+          <div>
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: activeTab === 'opname' ? '#0f172a' : '#475569' }}>
+              3. Stok Opname & Cek Fisik
+            </div>
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>
+              Audit fisik per lemari rak vs sistem & Lap SO
+            </div>
+          </div>
+        </button>
       </div>
 
-      {/* TAB 1: Inventory Catalog */}
+      {/* ── KARTU METRIK SPESIFIK SESUAI FITUR YANG DIPILIH ── */}
+      {activeTab === 'inventory' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+          <div className="stat-card" style={{ border: '1.5px solid #a7f3d0', background: '#fcfdfd' }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#047857', textTransform: 'uppercase', margin: 0 }}>Total Varian Obat</p>
+            <p style={{ fontSize: '1.45rem', fontWeight: 900, color: '#0f172a', margin: '4px 0 2px' }}>{products.length} Varian</p>
+            <p style={{ fontSize: 11.5, color: '#64748b', margin: 0 }}>Tersimpan di database katalog apotek</p>
+          </div>
+          <div className="stat-card">
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', margin: 0 }}>Total Kuantitas Fisik</p>
+            <p style={{ fontSize: '1.45rem', fontWeight: 900, color: '#0f172a', margin: '4px 0 2px' }}>{totalUnits} Unit</p>
+            <p style={{ fontSize: 11.5, color: '#64748b', margin: 0 }}>Total strip, botol, & tablet di rak</p>
+          </div>
+          <div className="stat-card">
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#dc2626', textTransform: 'uppercase', margin: 0 }}>Obat Stok Menipis (&lt;10)</p>
+            <p style={{ fontSize: '1.45rem', fontWeight: 900, color: '#dc2626', margin: '4px 0 2px' }}>{lowStockCount} Obat</p>
+            <p style={{ fontSize: 11.5, color: '#64748b', margin: 0 }}>Segera buat pesanan ke distributor PBF</p>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'incoming' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+          <div className="stat-card" style={{ border: '1.5px solid #bae6fd', background: '#fcfdfd' }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#0369a1', textTransform: 'uppercase', margin: 0 }}>Total Belanja Faktur PBF</p>
+            <p style={{ fontSize: '1.45rem', fontWeight: 900, color: '#0369a1', margin: '4px 0 2px' }}>{formatRupiah(totalIncomingPurchases)}</p>
+            <p style={{ fontSize: 11.5, color: '#64748b', margin: 0 }}>Akumulasi faktur pengadaan obat</p>
+          </div>
+          <div className="stat-card" style={{ border: '1.5px solid #fed7aa' }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#b45309', textTransform: 'uppercase', margin: 0 }}>Hutang Faktur Tempo</p>
+            <p style={{ fontSize: '1.45rem', fontWeight: 900, color: '#b45309', margin: '4px 0 2px' }}>{formatRupiah(totalHutangAmount)}</p>
+            <p style={{ fontSize: 11.5, color: '#b45309', margin: 0 }}>{hutangGoods.length} faktur tempo belum jatuh tempo</p>
+          </div>
+          <div className="stat-card">
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#047857', textTransform: 'uppercase', margin: 0 }}>Faktur Lunas Langsung</p>
+            <p style={{ fontSize: '1.45rem', fontWeight: 900, color: '#047857', margin: '4px 0 2px' }}>{formatRupiah(totalLunasAmount)}</p>
+            <p style={{ fontSize: 11.5, color: '#64748b', margin: 0 }}>{lunasGoods.length} faktur dibayar tunai</p>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'opname' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+          <div className="stat-card" style={{ border: '1.5px solid #fde68a', background: '#fcfdfd' }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#b45309', textTransform: 'uppercase', margin: 0 }}>Total Obat di Rak</p>
+            <p style={{ fontSize: '1.45rem', fontWeight: 900, color: '#0f172a', margin: '4px 0 2px' }}>{products.length} Item</p>
+            <p style={{ fontSize: 11.5, color: '#64748b', margin: 0 }}>Target penghitungan fisik lemari rak</p>
+          </div>
+          <div className="stat-card">
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#047857', textTransform: 'uppercase', margin: 0 }}>Sudah Dihitung Fisik</p>
+            <p style={{ fontSize: '1.45rem', fontWeight: 900, color: '#047857', margin: '4px 0 2px' }}>{opnameCheckedCount} Obat</p>
+            <p style={{ fontSize: 11.5, color: '#64748b', margin: 0 }}>Diinput oleh petugas pemeriksa</p>
+          </div>
+          <div className="stat-card">
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#dc2626', textTransform: 'uppercase', margin: 0 }}>Temuan Selisih / Minus</p>
+            <p style={{ fontSize: '1.45rem', fontWeight: 900, color: '#dc2626', margin: '4px 0 2px' }}>{discrepancyCount} Obat</p>
+            <p style={{ fontSize: 11.5, color: '#64748b', margin: 0 }}>Stok fisik tidak sama dengan komputer</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── KONTEN TAB 1: KATALOG & STOK OBAT APOTEK ── */}
       {activeTab === 'inventory' && (
         <div className="card">
           {/* Table toolbar */}
@@ -610,43 +814,90 @@ export function Inventory({
         </div>
       )}
 
-      {/* TAB 2: Pembelian Obat & Faktur Masuk PBF */}
+      {/* ── KONTEN TAB 2: PEMBELIAN OBAT & FAKTUR MASUK PBF ── */}
       {activeTab === 'incoming' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {incomingGoods.length === 0 ? (
+          {/* Toolbar Khusus Pembelian PBF */}
+          <div className="card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 220 }}>
+              <div style={{ position: 'relative', flex: 1, maxWidth: 280 }}>
+                <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+                <input 
+                  className="form-input" 
+                  placeholder="Cari No. Faktur atau Supplier PBF..." 
+                  value={incomingSearch} 
+                  onChange={e => setIncomingSearch(e.target.value)}
+                  style={{ paddingLeft: 32, height: 38, fontSize: 12.5 }}
+                />
+              </div>
+
+              {/* Filter Status Bayar */}
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[
+                  { id: 'ALL', label: 'Semua Status' },
+                  { id: 'HUTANG', label: '⏳ Hutang Tempo' },
+                  { id: 'TUNAI', label: '💵 Lunas Tunai' }
+                ].map(b => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => setIncomingPaymentFilter(b.id)}
+                    className={`btn btn-sm ${incomingPaymentFilter === b.id ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ height: 38, borderRadius: 8, fontSize: 11.5 }}
+                  >
+                    {b.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button 
+              type="button" 
+              className="btn btn-primary" 
+              onClick={openIncoming}
+              style={{ background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', borderRadius: 8, height: 38, gap: 6 }}
+            >
+              <Truck size={15} />
+              <span>+ Input Faktur Pembelian PBF Baru</span>
+            </button>
+          </div>
+
+          {filteredIncomingGoods.length === 0 ? (
             <div className="card">
               <div className="empty-state">
-                <div className="empty-state-icon"><Truck size={22} color="#059669" /></div>
-                <h4>Belum ada catatan penerimaan faktur pengadaan</h4>
-                <p>Klik tombol "+ Input Faktur Masuk (PBF)" di kanan atas untuk mencatat pembelian obat dari distributor PT. BINAYA dll</p>
+                <div className="empty-state-icon" style={{ background: '#f0f9ff', color: '#0284c7' }}><Truck size={24} /></div>
+                <h4>Belum Ada Catatan Faktur Pembelian</h4>
+                <p>Klik tombol "+ Input Faktur Pembelian PBF Baru" di atas untuk mencatat faktur masuk dari PT. BINAYA, Kimia Farma, dll.</p>
               </div>
             </div>
           ) : (
-            incomingGoods.map(inv => (
-              <div key={inv.id} className="card">
+            filteredIncomingGoods.map(inv => (
+              <div key={inv.id} className="card" style={{ border: inv.payment_term === 'HUTANG' ? '1.5px solid #fed7aa' : '1px solid #e2e8f0' }}>
                 <div style={{ padding: '16px 20px', borderBottom: '1px solid #f0f1f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div className="icon-box" style={{ background: '#ecfdf5', color: '#059669' }}><Truck size={17} /></div>
+                    <div className="icon-box" style={{ background: inv.payment_term === 'HUTANG' ? '#fffbeb' : '#f0f9ff', color: inv.payment_term === 'HUTANG' ? '#d97706' : '#0284c7' }}>
+                      <Building2 size={18} />
+                    </div>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.975rem' }}>{inv.invoice_number}</span>
-                        <span className="badge badge-green">Stok Masuk Kasir</span>
-                        <span className={`badge ${inv.payment_term === 'HUTANG' ? 'badge-amber' : 'badge-green'}`}>
-                          {inv.payment_term || 'TUNAI'}
+                        <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '1rem' }}>{inv.invoice_number}</span>
+                        <span className={`badge ${inv.payment_term === 'HUTANG' ? 'badge-amber' : 'badge-green'}`} style={{ fontWeight: 800 }}>
+                          {inv.payment_term === 'HUTANG' ? '⏳ HUTANG TEMPO' : '✓ LUNAS TUNAI'}
                         </span>
+                        <span className="badge badge-green">Stok Masuk Kasir</span>
                       </div>
                       <p style={{ fontSize: 12, color: '#64748b', margin: '3px 0 0' }}>
-                        Supplier: <strong>{inv.supplier_name}</strong> &bull; Masuk: {formatDateTime(inv.date, tz).split(',')[0]}
-                        {inv.due_date && <span> &bull; <strong>Jatuh Tempo: {inv.due_date}</strong></span>}
+                        Supplier PBF: <strong>{inv.supplier_name}</strong> &bull; Masuk: {formatDateTime(inv.date, tz).split(',')[0]}
+                        {inv.due_date && <span style={{ color: '#b45309', fontWeight: 700 }}> &bull; Jatuh Tempo: {inv.due_date}</span>}
                       </p>
                     </div>
                   </div>
 
                   <div style={{ textAlign: 'right' }}>
                     <p style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
-                      Total Faktur
+                      Total Tagihan Faktur
                     </p>
-                    <p style={{ fontSize: '1.15rem', fontWeight: 900, color: '#047857', margin: 0 }}>
+                    <p style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0369a1', margin: 0 }}>
                       {formatRupiah(inv.total_amount)}
                     </p>
                   </div>
@@ -656,11 +907,11 @@ export function Inventory({
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <th style={{ paddingLeft: 20 }}>Obat Diterima</th>
-                        <th className="text-center">Jumlah Masuk</th>
-                        <th className="text-right">Harga Beli Satuan</th>
+                        <th style={{ paddingLeft: 20 }}>Rincian Obat Diterima</th>
+                        <th className="text-center">Kuantitas Masuk</th>
+                        <th className="text-right">Harga Beli Satuan (HPP)</th>
                         <th className="text-right">Subtotal</th>
-                        <th>No Batch (NB)</th>
+                        <th>No. Batch (NB)</th>
                         <th style={{ paddingRight: 20 }}>Tgl Expired (ED)</th>
                       </tr>
                     </thead>
@@ -669,16 +920,16 @@ export function Inventory({
                         <tr key={idx}>
                           <td style={{ paddingLeft: 20, fontWeight: 700, color: '#0f172a' }}>{it.productName}</td>
                           <td style={{ textAlign: 'center' }}>
-                            <span className="badge badge-green" style={{ fontWeight: 800 }}>+{it.qty} {it.unit || 'unit'}</span>
+                            <span className="badge badge-blue" style={{ fontWeight: 800 }}>+{it.qty} {it.unit || 'Strip'}</span>
                           </td>
                           <td style={{ textAlign: 'right', color: '#475569' }}>
                             {formatRupiah(it.buy_price)}
                           </td>
-                          <td style={{ textAlign: 'right', fontWeight: 800, color: '#047857' }}>
+                          <td style={{ textAlign: 'right', fontWeight: 800, color: '#0369a1' }}>
                             {formatRupiah(it.subtotal)}
                           </td>
                           <td>
-                            <span style={{ fontSize: 11.5, fontWeight: 600, color: '#475569' }}>{it.batch_no || '-'}</span>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>{it.batch_no || '-'}</span>
                           </td>
                           <td style={{ paddingRight: 20, fontSize: 12, color: '#64748b' }}>
                             {it.exp_date || '-'}
@@ -687,6 +938,11 @@ export function Inventory({
                       ))}
                     </tbody>
                   </table>
+                  {inv.notes && (
+                    <div style={{ padding: '10px 20px', background: '#fafbfd', fontSize: 12, color: '#64748b', borderTop: '1px solid #f0f1f6' }}>
+                      <span style={{ fontWeight: 700, color: '#334155' }}>Catatan Faktur: </span>{inv.notes}
+                    </div>
+                  )}
                 </div>
               </div>
             ))
@@ -694,9 +950,9 @@ export function Inventory({
         </div>
       )}
 
-      {/* TAB 3: Stok Opname Fisik vs Sistem & Lembar Cek Fisik */}
+      {/* ── KONTEN TAB 3: STOK OPNAME & CEK FISIK LEMARI RAK ── */}
       {activeTab === 'opname' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Sub-Tabs: Input SO Aktif vs Riwayat SO */}
           <div style={{ display: 'flex', gap: 10, borderBottom: '1px solid #e2e8f0', paddingBottom: 10 }}>
             <button
@@ -707,13 +963,13 @@ export function Inventory({
                 borderRadius: 10,
                 fontSize: 13,
                 fontWeight: opnameSubTab === 'active_so' ? 800 : 600,
-                background: opnameSubTab === 'active_so' ? '#ecfdf5' : 'transparent',
-                color: opnameSubTab === 'active_so' ? '#047857' : '#64748b',
-                border: opnameSubTab === 'active_so' ? '1px solid #a7f3d0' : 'none',
+                background: opnameSubTab === 'active_so' ? '#fffbeb' : 'transparent',
+                color: opnameSubTab === 'active_so' ? '#b45309' : '#64748b',
+                border: opnameSubTab === 'active_so' ? '1.5px solid #fde68a' : 'none',
                 cursor: 'pointer'
               }}
             >
-              📋 Cek Fisik & Input SO Sistem
+              📋 Cek Fisik Lemari Rak & Input SO
             </button>
             <button
               type="button"
@@ -723,9 +979,9 @@ export function Inventory({
                 borderRadius: 10,
                 fontSize: 13,
                 fontWeight: opnameSubTab === 'so_history' ? 800 : 600,
-                background: opnameSubTab === 'so_history' ? '#ecfdf5' : 'transparent',
-                color: opnameSubTab === 'so_history' ? '#047857' : '#64748b',
-                border: opnameSubTab === 'so_history' ? '1px solid #a7f3d0' : 'none',
+                background: opnameSubTab === 'so_history' ? '#fffbeb' : 'transparent',
+                color: opnameSubTab === 'so_history' ? '#b45309' : '#64748b',
+                border: opnameSubTab === 'so_history' ? '1.5px solid #fde68a' : 'none',
                 cursor: 'pointer'
               }}
             >
@@ -784,7 +1040,7 @@ export function Inventory({
                 </div>
 
                 <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>
-                  {opnameFilteredProducts.length} obat siap dicek
+                  {opnameFilteredProducts.length} obat siap dihitung
                 </span>
               </div>
 
@@ -1069,7 +1325,7 @@ export function Inventory({
           <div className="modal-box" style={{ maxWidth: 640 }}>
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div className="icon-box-sm" style={{ background: '#ecfdf5', color: '#059669' }}>
+                <div className="icon-box-sm" style={{ background: '#f0f9ff', color: '#0284c7' }}>
                   <Truck size={17} />
                 </div>
                 <div>
@@ -1308,7 +1564,7 @@ export function Inventory({
                   <button 
                     type="submit" 
                     className="btn btn-primary btn-lg" 
-                    style={{ flex: 2, borderRadius: 10, background: 'linear-gradient(135deg, #059669 0%, #0d9488 100%)' }}
+                    style={{ flex: 2, borderRadius: 10, background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)' }}
                   >
                     <CheckCircle size={16} /> Simpan & Verifikasi Masuk Kasir
                   </button>
