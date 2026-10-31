@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   Search, ShoppingCart, Trash2, CheckCircle, 
-  AlertCircle, ScanLine, X, Clock, Banknote, QrCode, Printer
+  AlertCircle, ScanLine, X, Clock, Banknote, QrCode, Printer, Keyboard
 } from 'lucide-react';
 import { formatRupiah } from '../utils';
 import { ROLES } from '../config/auth';
@@ -30,6 +30,7 @@ export function POS({
   const [barcodeInput, setBarcodeInput] = useState('');
   const [payError, setPayError] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Tunai'); // 'Tunai' or 'QRIS'
+  const searchInputRef = useRef(null);
   const isOwner = currentUser?.role === ROLES.OWNER;
   const dispatchCheckout = onTransactionComplete || onCheckout || (() => {});
 
@@ -163,6 +164,26 @@ export function POS({
     setActiveCategory('Semua');
   };
 
+  // Keyboard Shortcuts for Cashier
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'F4') {
+        e.preventDefault();
+        if (cart.length > 0 && !isCheckoutOpen) {
+          handleOpenCheckout();
+        }
+      } else if (e.key === 'Escape') {
+        if (isCheckoutOpen) setIsCheckoutOpen(false);
+        if (isSuccessOpen) handleNewTransaction();
+      } else if (e.key === '/' && document.activeElement?.tagName !== 'INPUT') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [cart.length, isCheckoutOpen, isSuccessOpen]);
+
   // QRIS Image URL
   const qrisUrl = useMemo(() => {
     const merchant = (settings?.qris?.merchant_name || 'APOTEK_MEDIKA_SEJAHTERA').replace(/\s+/g, '_');
@@ -258,12 +279,21 @@ export function POS({
           <div style={{ position: 'relative', flex: 1 }}>
             <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
             <input
+              ref={searchInputRef}
               className="form-input"
-              placeholder="Cari nama obat (contoh: Paracetamol, Vitamin C)..."
-              style={{ paddingLeft: 32, height: 38 }}
+              placeholder="Cari nama obat (tekan '/' untuk cari cepat)..."
+              style={{ paddingLeft: 32, paddingRight: 32, height: 38 }}
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
             />
+            <span style={{
+              position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+              fontSize: 10, fontWeight: 700, color: '#94a3b8',
+              background: '#f1f5f9', border: '1px solid #e2e8f0',
+              padding: '1px 5px', borderRadius: 4
+            }}>
+              /
+            </span>
           </div>
           <div style={{ position: 'relative', width: 180 }}>
             <ScanLine size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
@@ -459,11 +489,15 @@ export function POS({
 
           <button
             className="btn btn-primary btn-lg"
-            style={{ width: '100%', borderRadius: 10 }}
+            style={{ width: '100%', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
             disabled={cart.length === 0}
             onClick={handleOpenCheckout}
           >
-            <CheckCircle size={17} /> Proses Pembayaran
+            <CheckCircle size={17} /> 
+            <span>Proses Pembayaran</span>
+            <span style={{ fontSize: 11, background: 'rgba(255,255,255,0.25)', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>
+              F4
+            </span>
           </button>
         </div>
       </div>

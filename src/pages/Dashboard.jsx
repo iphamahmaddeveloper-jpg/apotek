@@ -168,9 +168,9 @@ export function Dashboard({ products = [], transactions = [], incomingGoods: _in
         paddingBottom: 2
       }}>
         <div>
-          <h2 className="section-title" style={{ fontSize: '1.4rem' }}>Ringkasan Eksekutif</h2>
+          <h2 className="section-title" style={{ fontSize: '1.4rem' }}>Dashboard & Ringkasan Apotek</h2>
           <p className="section-subtitle" style={{ fontSize: '0.875rem' }}>
-            Pantau arus kas, margin keuntungan, aktivitas kasir POS, dan inventaris obat secara real-time
+            Pantau omzet kasir harian, laba bersih, dan status persediaan obat secara mudah dan real-time
           </p>
         </div>
 

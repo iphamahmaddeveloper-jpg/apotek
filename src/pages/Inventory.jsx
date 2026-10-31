@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { 
   Search, Plus, Truck, Boxes, BarChart2, PackagePlus, 
-  AlertCircle, Trash2, CheckCircle
+  AlertCircle, Trash2, CheckCircle, Eye, EyeOff, Info, X
 } from 'lucide-react';
 import { formatRupiah, formatDateTime, getLocalDateString } from '../utils';
 import { useSearchParams } from 'react-router-dom';
@@ -32,6 +32,9 @@ export function Inventory({
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get('search') || '');
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const [filterStockStatus, setFilterStockStatus] = useState('ALL'); // 'ALL' | 'LOW'
+  const [showFinancialColumns, setShowFinancialColumns] = useState(false);
+  const [showStaffGuide, setShowStaffGuide] = useState(() => !localStorage.getItem('hide_scenario_b_guide'));
   const [activeTab, setActiveTab] = useState('inventory');
   const tz = settings?.timezone || 'Asia/Jakarta';
 
@@ -223,8 +226,11 @@ export function Inventory({
     const q = searchTerm.toLowerCase();
     const matchSearch = p.name.toLowerCase().includes(q) || p.location.toLowerCase().includes(q) || (p.supplier || '').toLowerCase().includes(q);
     const matchCat = categoryFilter === 'All' || p.category === categoryFilter;
-    return matchSearch && matchCat;
-  }), [products, searchTerm, categoryFilter]);
+    const matchStock = filterStockStatus === 'ALL' || (filterStockStatus === 'LOW' && p.stock < (p.min_stock || 10));
+    return matchSearch && matchCat && matchStock;
+  }), [products, searchTerm, categoryFilter, filterStockStatus]);
+
+  const lowStockCount = useMemo(() => products.filter(p => p.stock < (p.min_stock || 10)).length, [products]);
 
   const totalAsset = useMemo(() => products.reduce((s, p) => s + (p.buy_price || 0) * (p.stock || 0), 0), [products]);
   const totalPotential = useMemo(() => products.reduce((s, p) => s + (p.price || 0) * (p.stock || 0), 0), [products]);
@@ -238,15 +244,27 @@ export function Inventory({
           <h2 className="section-title">Inventaris & Barang Masuk</h2>
           <p className="section-subtitle">
             {isOwner 
-              ? 'Kelola data obat, HPP modal, lokasi rak, dan verifikasi faktur tagihan PBF distributor' 
-              : 'Katalog obat apotek, cek lokasi rak, dan input penerimaan barang kurir agar langsung bisa dijual'
+              ? 'Kelola data obat, HPP modal, lokasi rak, dan verifikasi faktur tagihan PBF' 
+              : 'Cek stok obat di apotek, posisi rak, dan terima obat fisik yang diantar kurir'
             }
           </p>
         </div>
 
         {/* Action Buttons Header */}
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          {/* Tombol Terima Barang Kurir: BISA DIAKSES OLEH OWNER MAUPUN KARYAWAN */}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          {!isOwner && !showStaffGuide && (
+            <button 
+              type="button" 
+              className="btn btn-secondary btn-sm"
+              onClick={() => setShowStaffGuide(true)}
+              style={{ borderRadius: 8, gap: 6, fontSize: 12 }}
+            >
+              <Info size={14} color="#16a34a" />
+              <span>Panduan Kurir</span>
+            </button>
+          )}
+
+          {/* Tombol Terima Barang Kurir */}
           <button 
             className="btn btn-success" 
             onClick={openIncoming}
@@ -254,7 +272,7 @@ export function Inventory({
             title={isOwner ? "Input faktur tagihan lengkap distributor" : "Input barang kurir yang datang agar langsung bisa dijual di kasir"}
           >
             <Truck size={15} /> 
-            <span>{isOwner ? 'Input Faktur Masuk (PT)' : '📦 Terima Barang Kurir (+ Stok Fisik)'}</span>
+            <span>{isOwner ? 'Input Faktur Masuk' : 'Terima Barang Kurir'}</span>
           </button>
 
           {/* Tombol Tambah Obat Baru: HANYA OWNER */}
@@ -271,8 +289,8 @@ export function Inventory({
         </div>
       </div>
 
-      {/* Skenario B Explanation Banner for Staff */}
-      {!isOwner && (
+      {/* Skenario B Explanation Banner for Staff (Dismissible) */}
+      {!isOwner && showStaffGuide && (
         <div style={{
           background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
           border: '1.5px solid #a7f3d0',
@@ -280,14 +298,28 @@ export function Inventory({
           padding: '12px 18px',
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'space-between',
           gap: 12
         }}>
-          <div className="icon-box-sm" style={{ background: '#dcfce7', flexShrink: 0 }}>
-            <CheckCircle size={16} color="#16a34a" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div className="icon-box-sm" style={{ background: '#dcfce7', flexShrink: 0 }}>
+              <CheckCircle size={16} color="#16a34a" />
+            </div>
+            <div style={{ fontSize: 12.5, color: '#166534', lineHeight: 1.4 }}>
+              <strong>Alur Penerimaan Barang Kurir:</strong> Ketika kurir PBF mengantar obat saat Owner sedang di luar, Anda bisa langsung klik tombol hijau <strong>"Terima Barang Kurir"</strong> di atas atau tombol <strong>"+ Stok"</strong> di tabel. Stok seketika bertambah dan obat <strong>langsung siap dijual di kasir saat itu juga</strong>.
+            </div>
           </div>
-          <div style={{ fontSize: 12.5, color: '#166534', lineHeight: 1.4 }}>
-            <strong>Alur Penerimaan Barang Kurir (Skenario B Aktif):</strong> Ketika kurir PBF mengantar obat saat Owner tidak ada di toko, Anda bisa langsung klik tombol hijau <strong>"Terima Barang Kurir"</strong> di atas atau tombol <strong>"+ Stok"</strong> di tabel. Stok seketika bertambah dan obat <strong>langsung bisa dijual di kasir saat itu juga</strong> tanpa perlu menunggu Owner datang.
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.setItem('hide_scenario_b_guide', 'true');
+              setShowStaffGuide(false);
+            }}
+            style={{ background: 'transparent', border: 'none', color: '#166534', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center' }}
+            title="Tutup panduan ini"
+          >
+            <X size={16} />
+          </button>
         </div>
       )}
 
@@ -313,19 +345,59 @@ export function Inventory({
       {activeTab === 'inventory' && (
         <div className="card">
           {/* Table toolbar */}
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid #f0f1f6', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: 260, maxWidth: 360 }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid #f0f1f6', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {/* Search Box */}
+            <div style={{ position: 'relative', flex: 1, minWidth: 220, maxWidth: 320 }}>
               <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
-              <input className="form-input" placeholder="Cari nama obat, nomor rak, atau PT..." style={{ paddingLeft: 32, height: 38 }}
+              <input className="form-input" placeholder="Cari nama obat atau rak..." style={{ paddingLeft: 32, height: 38 }}
                 value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
             </div>
-            <select className="form-input form-select" style={{ width: 180, height: 38 }}
+
+            {/* Quick Status Filters */}
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <button
+                type="button"
+                className={`btn btn-sm ${filterStockStatus === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setFilterStockStatus('ALL')}
+                style={{ height: 38, borderRadius: 8, fontSize: 12 }}
+              >
+                Semua ({products.length})
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${filterStockStatus === 'LOW' ? 'btn-danger' : 'btn-secondary'}`}
+                onClick={() => setFilterStockStatus(filterStockStatus === 'LOW' ? 'ALL' : 'LOW')}
+                style={{ height: 38, borderRadius: 8, fontSize: 12, gap: 5 }}
+                title="Tampilkan hanya obat yang stoknya menipis"
+              >
+                <AlertCircle size={13} />
+                <span>Stok Menipis ({lowStockCount})</span>
+              </button>
+            </div>
+
+            {/* Category Filter */}
+            <select className="form-input form-select" style={{ width: 170, height: 38, fontSize: 12.5 }}
               value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
               <option value="All">Semua Kategori</option>
               {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
+
+            {/* Owner Toggle for HPP/Margin */}
+            {isOwner && (
+              <button
+                type="button"
+                onClick={() => setShowFinancialColumns(!showFinancialColumns)}
+                className="btn btn-secondary btn-sm"
+                style={{ height: 38, gap: 6, borderRadius: 8, fontSize: 12, whiteSpace: 'nowrap' }}
+                title={showFinancialColumns ? "Sembunyikan kolom finansial HPP" : "Buka kolom HPP modal & margin keuntungan"}
+              >
+                {showFinancialColumns ? <EyeOff size={14} color="#6366f1" /> : <Eye size={14} />}
+                <span>{showFinancialColumns ? 'Mode Ringkas' : 'Detail HPP & Modal'}</span>
+              </button>
+            )}
+
             <span style={{ fontSize: 12.5, color: '#9ca3af', fontWeight: 500, marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-              {filteredProducts.length} obat terdaftar
+              {filteredProducts.length} obat ditampilkan
             </span>
           </div>
 
@@ -333,15 +405,18 @@ export function Inventory({
             <table className="data-table">
               <thead>
                 <tr>
-                  <th style={{ paddingLeft: 20 }}>Nama Obat</th>
-                  <th>Kategori</th>
-                  <th>Supplier (PT/PBF)</th>
-                  <th className="text-right">Harga Beli (HPP)</th>
-                  <th className="text-right">Harga Jual</th>
-                  <th className="text-center">Margin</th>
-                  <th className="text-center">Stok</th>
+                  <th style={{ paddingLeft: 20 }}>Nama & Kategori Obat</th>
                   <th>Lokasi Rak</th>
-                  <th className="text-right" style={{ paddingRight: 20 }}>Aksi Operasional</th>
+                  <th className="text-center">Sisa Stok</th>
+                  <th className="text-right">Harga Jual</th>
+                  {isOwner && showFinancialColumns && (
+                    <>
+                      <th>Supplier (PBF)</th>
+                      <th className="text-right">HPP Modal</th>
+                      <th className="text-center">Margin</th>
+                    </>
+                  )}
+                  <th className="text-right" style={{ paddingRight: 20 }}>Aksi Cepat</th>
                 </tr>
               </thead>
               <tbody>
@@ -352,41 +427,55 @@ export function Inventory({
 
                   return (
                     <tr key={p.id}>
-                      <td style={{ paddingLeft: 20, fontWeight: 700, color: '#1e2432' }}>{p.name}</td>
-                      <td><span className="badge badge-gray">{p.category}</span></td>
-                      <td style={{ fontSize: 12, color: '#6b7280', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.supplier}>{p.supplier || '-'}</td>
-                      
-                      {/* HARGA BELI HPP: HANYA OWNER BISA LIHAT */}
-                      <td style={{ textAlign: 'right', color: '#6b7280' }}>
-                        {isOwner ? (
-                          formatRupiah(p.buy_price || 0)
-                        ) : (
-                          <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: 11.5 }} title="Informasi rahasia Owner">
-                            Rp •••••• (Owner)
+                      {/* Nama & Kategori Obat */}
+                      <td style={{ paddingLeft: 20 }}>
+                        <div style={{ fontWeight: 700, color: '#1e2432', fontSize: '0.925rem' }}>{p.name}</div>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 3 }}>
+                          <span className="badge badge-gray" style={{ fontSize: 10.5, padding: '1px 6px' }}>{p.category}</span>
+                          {!showFinancialColumns && p.supplier && (
+                            <span style={{ fontSize: 11, color: '#94a3b8' }}>&bull; {p.supplier}</span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Lokasi Rak */}
+                      <td style={{ fontSize: 12.5, color: '#334155', fontWeight: 600 }}>
+                        📍 {p.location || 'Rak Utama'}
+                      </td>
+
+                      {/* Sisa Stok */}
+                      <td style={{ textAlign: 'center' }}>
+                        <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                          <span className={`badge ${isLow ? 'badge-red' : 'badge-green'}`} style={{ fontWeight: 800 }}>
+                            {p.stock} pcs
                           </span>
-                        )}
+                          {isLow && (
+                            <span style={{ fontSize: 10, color: '#dc2626', fontWeight: 700 }}>Perlu Restock</span>
+                          )}
+                        </div>
                       </td>
 
-                      <td style={{ textAlign: 'right', fontWeight: 700, color: '#1e2432' }}>{formatRupiah(p.price)}</td>
-                      
-                      {/* MARGIN LABA: HANYA OWNER BISA LIHAT */}
-                      <td style={{ textAlign: 'center' }}>
-                        {isOwner ? (
-                          <span className="badge badge-green">+{marginPct}%</span>
-                        ) : (
-                          <span className="badge badge-gray">—</span>
-                        )}
+                      {/* Harga Jual */}
+                      <td style={{ textAlign: 'right', fontWeight: 800, color: '#1e2432', fontSize: '0.95rem' }}>
+                        {formatRupiah(p.price)}
                       </td>
 
-                      <td style={{ textAlign: 'center' }}>
-                        <span className={`badge ${isLow ? 'badge-red' : 'badge-indigo'}`}>{p.stock}</span>
-                      </td>
+                      {/* Financial columns when owner enabled */}
+                      {isOwner && showFinancialColumns && (
+                        <>
+                          <td style={{ fontSize: 12, color: '#6b7280', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.supplier}>
+                            {p.supplier || '-'}
+                          </td>
+                          <td style={{ textAlign: 'right', color: '#6b7280', fontSize: 12.5 }}>
+                            {formatRupiah(p.buy_price || 0)}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span className="badge badge-green">+{marginPct}%</span>
+                          </td>
+                        </>
+                      )}
 
-                      <td style={{ fontSize: 12.5, color: '#475569', fontWeight: 600 }}>
-                        📍 {p.location}
-                      </td>
-
-                      {/* AKSI OPERASIONAL: BISA TAMBAH STOK KAPAN SAJA */}
+                      {/* Aksi Operasional */}
                       <td style={{ textAlign: 'right', paddingRight: 20 }}>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
                           <button 
@@ -412,11 +501,11 @@ export function Inventory({
 
                 {filteredProducts.length === 0 && (
                   <tr>
-                    <td colSpan={9}>
+                    <td colSpan={isOwner && showFinancialColumns ? 8 : 5}>
                       <div className="empty-state">
                         <div className="empty-state-icon"><Search size={22} /></div>
                         <h4>Obat tidak ditemukan</h4>
-                        <p>Coba kata kunci lain atau ubah filter kategori</p>
+                        <p>Coba kata kunci lain atau ubah filter kategori/stok</p>
                       </div>
                     </td>
                   </tr>
@@ -549,44 +638,61 @@ export function Inventory({
                   <tr>
                     <th style={{ paddingLeft: 20 }}>Nama Obat</th>
                     <th>Lokasi Rak</th>
-                    <th className="text-right">HPP Modal/unit</th>
-                    <th className="text-center">Stok Sistem</th>
-                    <th className="text-right">Nilai Aset</th>
+                    {isOwner ? (
+                      <>
+                        <th className="text-right">HPP Modal/unit</th>
+                        <th className="text-center">Stok Sistem</th>
+                        <th className="text-right">Nilai Aset</th>
+                      </>
+                    ) : (
+                      <>
+                        <th className="text-center">Stok Sistem</th>
+                        <th className="text-center">Status Fisik</th>
+                      </>
+                    )}
                     <th className="text-right" style={{ paddingRight: 20 }}>Aksi Cepat</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map(p => (
-                    <tr key={p.id}>
-                      <td style={{ paddingLeft: 20, fontWeight: 600, color: '#1e2432' }}>{p.name}</td>
-                      <td><span className="badge badge-gray">{p.location}</span></td>
-                      <td style={{ textAlign: 'right', color: '#6b7280' }}>
+                  {products.map(p => {
+                    const isLow = p.stock < (p.min_stock || 10);
+                    return (
+                      <tr key={p.id}>
+                        <td style={{ paddingLeft: 20, fontWeight: 600, color: '#1e2432' }}>{p.name}</td>
+                        <td><span className="badge badge-gray">📍 {p.location}</span></td>
                         {isOwner ? (
-                          formatRupiah(p.buy_price || 0)
+                          <>
+                            <td style={{ textAlign: 'right', color: '#6b7280' }}>
+                              {formatRupiah(p.buy_price || 0)}
+                            </td>
+                            <td style={{ textAlign: 'center' }}><span className="badge badge-indigo">{p.stock} pcs</span></td>
+                            <td style={{ textAlign: 'right', fontWeight: 700, color: '#1e2432' }}>
+                              {formatRupiah((p.buy_price || 0) * (p.stock || 0))}
+                            </td>
+                          </>
                         ) : (
-                          <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: 11.5 }}>Rp ••••••</span>
+                          <>
+                            <td style={{ textAlign: 'center' }}><span className="badge badge-indigo" style={{ fontWeight: 800 }}>{p.stock} pcs</span></td>
+                            <td style={{ textAlign: 'center' }}>
+                              <span className={`badge ${isLow ? 'badge-red' : 'badge-green'}`}>
+                                {isLow ? '⚠️ Stok Menipis' : '✓ Stok Cukup'}
+                              </span>
+                            </td>
+                          </>
                         )}
-                      </td>
-                      <td style={{ textAlign: 'center' }}><span className="badge badge-indigo">{p.stock} pcs</span></td>
-                      <td style={{ textAlign: 'right', fontWeight: 700, color: '#1e2432' }}>
-                        {isOwner ? (
-                          formatRupiah((p.buy_price || 0) * (p.stock || 0))
-                        ) : (
-                          <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: 11.5 }}>Rp ••••••</span>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'right', paddingRight: 20 }}>
-                        <button 
-                          className="btn btn-secondary btn-sm" 
-                          onClick={() => openQuickStock(p)} 
-                          style={{ gap: 4, borderRadius: 6, fontSize: 11.5 }}
-                        >
-                          <PackagePlus size={13} color="#059669" />
-                          <span>+ Tambah Stok</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                        <td style={{ textAlign: 'right', paddingRight: 20 }}>
+                          <button 
+                            className="btn btn-secondary btn-sm" 
+                            onClick={() => openQuickStock(p)} 
+                            style={{ gap: 4, borderRadius: 6, fontSize: 11.5 }}
+                          >
+                            <PackagePlus size={13} color="#059669" />
+                            <span>+ Tambah Stok</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
