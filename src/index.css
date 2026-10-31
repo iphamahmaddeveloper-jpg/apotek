@@ -768,135 +768,154 @@
 }
 
 /* ===================================================
-   RESPONSIVE — Tablet (≤ 1024px)
+   DASHBOARD & POS RESPONSIVE GRID CLASSES
+   =================================================== */
+.dashboard-top-grid {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 18px;
+}
+
+.dashboard-bottom-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+
+.dashboard-card {
+  background: #ffffff;
+  border-radius: 22px;
+  padding: 24px 28px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 20px rgba(5, 150, 105, 0.04);
+  display: flex;
+  flex-direction: column;
+  justifyContent: space-between;
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dashboard-big-number {
+  font-size: 2.3rem;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+
+.pos-grid-container {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 16px;
+  height: calc(100vh - 120px);
+}
+
+/* ===================================================
+   RESPONSIVE — Tablet & iPad (769px - 1024px)
    =================================================== */
 @media (max-width: 1024px) {
   .sidebar-root {
-    width: 220px;
+    display: none !important;
   }
   .main-layout {
-    margin-left: 220px;
-    width: calc(100% - 220px);
+    margin-left: 0 !important;
+    width: 100% !important;
   }
-  .top-header {
-    padding: 0 20px;
+  .top-pill-navbar {
+    padding: 0 14px;
+    margin-top: 8px;
   }
   .page-container {
-    padding: 18px 20px 28px;
+    padding: 14px 14px 32px;
   }
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .dashboard-top-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+  .dashboard-bottom-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 16px !important;
+  }
+  .dashboard-bottom-grid > :last-child {
+    grid-column: span 2;
+  }
+  .pos-grid-container {
+    grid-template-columns: 1fr 340px !important;
+    height: calc(100vh - 110px) !important;
+    gap: 14px !important;
   }
 }
 
 /* ===================================================
-   RESPONSIVE — Mobile (≤ 768px)
-   Sidebar hidden → Bottom Navigation bar muncul
+   RESPONSIVE — Mobile & iPhone (≤ 768px)
    =================================================== */
 @media (max-width: 768px) {
-  /* Hide desktop sidebar */
   .sidebar-root {
-    transform: translateX(-100%);
-    width: 260px;
+    display: none !important;
   }
-  .sidebar-root.mobile-open {
-    transform: translateX(0);
-    box-shadow: 4px 0 24px rgba(0,0,0,0.18);
-  }
-
-  /* Main layout takes full width */
   .main-layout {
-    margin-left: 0;
-    width: 100%;
-    padding-bottom: 68px; /* room for bottom nav */
+    margin-left: 0 !important;
+    width: 100% !important;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   }
-
-  /* Header adjustments */
-  .top-header {
-    padding: 0 16px;
-    height: 56px;
+  .top-pill-navbar {
+    padding: 0 8px;
+    margin-top: 6px;
   }
-
-  /* Page container padding */
+  .top-pill-navbar-inner {
+    padding: 6px 10px;
+    border-radius: 18px;
+  }
   .page-container {
-    padding: 14px 16px 24px;
+    padding: 10px 8px calc(30px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .dashboard-top-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  .dashboard-bottom-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  .dashboard-bottom-grid > :last-child {
+    grid-column: span 1 !important;
+  }
+  .dashboard-card {
+    padding: 16px 14px !important;
+    border-radius: 18px !important;
+  }
+  .dashboard-big-number {
+    font-size: 1.8rem !important;
+  }
+  .pos-grid-container {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    gap: 14px !important;
   }
 
-  /* Bottom Navigation */
-  .bottom-nav {
-    display: flex;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 60px;
-    background: #ffffff;
-    border-top: 1px solid #e8eaf0;
-    z-index: 50;
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.06);
-  }
-  .bottom-nav-item {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    font-size: 10px;
-    font-weight: 600;
-    color: #9ca3af;
-    text-decoration: none;
-    border: none;
-    background: none;
-    cursor: pointer;
-    padding: 6px 4px;
-    transition: color 0.15s;
-    position: relative;
-  }
-  .bottom-nav-item.active {
-    color: #4f46e5;
-  }
-  .bottom-nav-item.active::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 20%;
-    right: 20%;
-    height: 2px;
-    background: #4f46e5;
-    border-radius: 0 0 4px 4px;
-  }
-
-  /* Stats: 2 columns on mobile */
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-  }
-  .stat-card {
-    padding: 14px 16px;
-    min-height: 110px;
-  }
-
-  /* Tables: scroll horizontally */
+  /* Tables: smooth horizontal scroll on touch screens */
   .table-responsive {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    width: 100%;
   }
 
-  /* Modals: full screen on mobile */
+  /* Modals: bottom-sheet / full screen on mobile */
   .modal-overlay > div {
-    max-height: 100dvh !important;
-    border-radius: 0 !important;
-    margin: 0 !important;
+    max-height: 94dvh !important;
+    width: 95% !important;
+    border-radius: 20px !important;
+    margin: auto !important;
   }
 
-  /* Form inputs: bigger touch targets */
-  .form-input {
+  /* Form inputs: iOS zoom prevention (16px) & touch targets */
+  input, select, textarea, .form-input {
     min-height: 44px;
-    font-size: 16px !important; /* prevent zoom on iOS */
+    font-size: 16px !important; /* Prevents auto-zoom on iOS Safari */
   }
   .btn {
-    min-height: 42px;
+    min-height: 40px;
   }
 
   /* Helper classes */
@@ -905,18 +924,30 @@
 }
 
 /* ===================================================
-   RESPONSIVE — Small Mobile (≤ 480px)
+   RESPONSIVE — Small Mobile (≤ 480px, e.g. iPhone SE)
    =================================================== */
 @media (max-width: 480px) {
+  .top-pill-navbar {
+    padding: 0 4px;
+    margin-top: 4px;
+  }
+  .top-pill-navbar-inner {
+    padding: 5px 8px;
+    border-radius: 16px;
+  }
+  .page-container {
+    padding: 8px 6px calc(30px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .dashboard-card {
+    padding: 14px 12px !important;
+    border-radius: 16px !important;
+  }
+  .dashboard-big-number {
+    font-size: 1.55rem !important;
+  }
   .stats-grid {
     grid-template-columns: 1fr 1fr;
     gap: 8px;
-  }
-  .page-container {
-    padding: 12px 12px 20px;
-  }
-  .top-header {
-    padding: 0 12px;
   }
 }
 

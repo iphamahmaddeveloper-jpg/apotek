@@ -30,6 +30,7 @@ export function POS({
   const [barcodeInput, setBarcodeInput] = useState('');
   const [payError, setPayError] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Tunai'); // 'Tunai' or 'QRIS'
+  const [mobileTab, setMobileTab] = useState('catalog'); // 'catalog' | 'cart'
   const searchInputRef = useRef(null);
   const isOwner = currentUser?.role === ROLES.OWNER;
   const dispatchCheckout = onTransactionComplete || onCheckout || (() => {});
@@ -192,9 +193,77 @@ export function POS({
   }, [total, settings]);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16, height: 'calc(100vh - 120px)' }} className="animate-fade-in">
+    <div className="pos-grid-container animate-fade-in" style={{ position: 'relative' }}>
+      {/* Mobile Tab Switcher (Katalog vs Keranjang) */}
+      <div className="show-on-mobile" style={{
+        display: 'none',
+        background: '#f1f5f9',
+        padding: 4,
+        borderRadius: 14,
+        gap: 4,
+        width: '100%',
+        marginBottom: 8
+      }}>
+        <button
+          type="button"
+          onClick={() => setMobileTab('catalog')}
+          style={{
+            flex: 1,
+            padding: '9px 12px',
+            borderRadius: 10,
+            fontSize: 13,
+            fontWeight: mobileTab === 'catalog' ? 800 : 600,
+            background: mobileTab === 'catalog' ? '#ffffff' : 'transparent',
+            color: mobileTab === 'catalog' ? '#047857' : '#64748b',
+            border: 'none',
+            cursor: 'pointer',
+            boxShadow: mobileTab === 'catalog' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          📦 Katalog ({filteredProducts.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileTab('cart')}
+          style={{
+            flex: 1,
+            padding: '9px 12px',
+            borderRadius: 10,
+            fontSize: 13,
+            fontWeight: mobileTab === 'cart' ? 800 : 600,
+            background: mobileTab === 'cart' ? '#ffffff' : 'transparent',
+            color: mobileTab === 'cart' ? '#047857' : '#64748b',
+            border: 'none',
+            cursor: 'pointer',
+            boxShadow: mobileTab === 'cart' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            transition: 'all 0.15s ease'
+          }}
+        >
+          🛒 Keranjang {cart.length > 0 && (
+            <span style={{
+              background: '#059669',
+              color: '#ffffff',
+              borderRadius: 9999,
+              padding: '1px 8px',
+              fontSize: 11,
+              fontWeight: 800
+            }}>
+              {cart.reduce((s, i) => s + i.qty, 0)}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* Left: Product Catalog */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflow: 'hidden' }}>
+      <div 
+        className={mobileTab === 'cart' ? 'hide-on-mobile' : ''} 
+        style={{ display: 'flex', flexDirection: 'column', gap: 12, overflow: 'hidden', flex: 1 }}
+      >
         {/* Header & Active Shift Status Bar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
           <div>
@@ -342,7 +411,7 @@ export function POS({
               <div style={{ fontSize: 12 }}>Coba ubah kata kunci pencarian atau filter kategori</div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(145px, 1fr))', gap: 10 }}>
               {filteredProducts.map(product => {
                 const isLow = product.stock <= (product.min_stock || 10);
                 return (
@@ -356,12 +425,12 @@ export function POS({
                       display: 'flex',
                       flexDirection: 'column',
                       justifyContent: 'space-between',
-                      borderRadius: 12,
+                      borderRadius: 14,
                       border: '1.5px solid #e8eaf0',
                       transition: 'all 0.15s ease'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#4f46e5';
+                      e.currentTarget.style.borderColor = '#059669';
                       e.currentTarget.style.transform = 'translateY(-2px)';
                     }}
                     onMouseLeave={(e) => {
@@ -370,8 +439,8 @@ export function POS({
                     }}
                   >
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: '#6366f1', background: '#eef2ff', padding: '1px 6px', borderRadius: 4 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4, gap: 4 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#047857', background: '#ecfdf5', padding: '1px 6px', borderRadius: 4 }}>
                           {product.category}
                         </span>
                         <span style={{
@@ -394,7 +463,7 @@ export function POS({
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 10, borderTop: '1px solid #f1f5f9', paddingTop: 8 }}>
-                      <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#4f46e5' }}>
+                      <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#047857' }}>
                         {formatRupiah(product.price)}
                       </span>
                       <span style={{ fontSize: 11, fontWeight: 700, color: '#059669' }}>
@@ -410,12 +479,15 @@ export function POS({
       </div>
 
       {/* Right: Cart & Checkout Summary */}
-      <div className="card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '100%' }}>
+      <div 
+        className={`card ${mobileTab === 'catalog' ? 'hide-on-mobile' : ''}`} 
+        style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '100%' }}
+      >
         {/* Cart Header */}
         <div style={{ padding: '14px 18px', borderBottom: '1px solid #f0f1f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-            <div className="icon-box-sm" style={{ background: '#eeefff' }}>
-              <ShoppingCart size={15} color="#4f46e5" />
+            <div className="icon-box-sm" style={{ background: '#ecfdf5' }}>
+              <ShoppingCart size={15} color="#059669" />
             </div>
             <div>
               <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e2432', margin: 0 }}>Keranjang Kasir</h3>
@@ -502,6 +574,56 @@ export function POS({
         </div>
       </div>
 
+      {/* Floating mobile cart bar when viewing catalog with items in cart */}
+      {mobileTab === 'catalog' && cart.length > 0 && (
+        <div 
+          className="show-on-mobile" 
+          style={{
+            display: 'none',
+            position: 'fixed',
+            bottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
+            left: 12,
+            right: 12,
+            zIndex: 40,
+            background: 'linear-gradient(135deg, #059669 0%, #0d9488 100%)',
+            color: '#ffffff',
+            borderRadius: 18,
+            padding: '12px 18px',
+            boxShadow: '0 8px 24px rgba(5, 150, 105, 0.4)',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer'
+          }}
+          onClick={() => setMobileTab('cart')}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.25)',
+              width: 32,
+              height: 32,
+              borderRadius: 9,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 800,
+              fontSize: 13
+            }}>
+              {cart.reduce((s, i) => s + i.qty, 0)}
+            </div>
+            <div>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 800 }}>Keranjang Kasir</p>
+              <p style={{ margin: 0, fontSize: 11, opacity: 0.9 }}>{cart.length} jenis obat</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 15, fontWeight: 900 }}>{formatRupiah(total)}</span>
+            <span style={{ fontSize: 12, fontWeight: 800, background: '#ffffff', color: '#047857', padding: '6px 14px', borderRadius: 9999 }}>
+              Lihat & Bayar &rarr;
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: Checkout */}
       {isCheckoutOpen && (
         <div className="modal-overlay">
@@ -519,8 +641,8 @@ export function POS({
                     type="button"
                     onClick={() => setPaymentMethod('Tunai')}
                     style={{
-                      border: `1.5px solid ${paymentMethod === 'Tunai' ? '#4f46e5' : '#e2e8f0'}`,
-                      background: paymentMethod === 'Tunai' ? '#eef2ff' : '#ffffff',
+                      border: `1.5px solid ${paymentMethod === 'Tunai' ? '#059669' : '#e2e8f0'}`,
+                      background: paymentMethod === 'Tunai' ? '#ecfdf5' : '#ffffff',
                       borderRadius: 10,
                       padding: '10px 12px',
                       display: 'flex',
@@ -528,7 +650,7 @@ export function POS({
                       justifyContent: 'center',
                       gap: 8,
                       fontWeight: 700,
-                      color: paymentMethod === 'Tunai' ? '#4f46e5' : '#475569',
+                      color: paymentMethod === 'Tunai' ? '#047857' : '#475569',
                       cursor: 'pointer'
                     }}
                   >

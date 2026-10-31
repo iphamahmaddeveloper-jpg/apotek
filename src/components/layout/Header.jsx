@@ -56,17 +56,21 @@ export function Header({
           }}>
             <Cross size={20} color="#ffffff" strokeWidth={2.6} />
           </div>
-          <div>
+          <div style={{ minWidth: 0, overflow: 'hidden' }}>
             <span style={{
               fontSize: '1.025rem',
               fontWeight: 800,
               color: '#0f172a',
               letterSpacing: '-0.02em',
-              whiteSpace: 'nowrap'
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: 'block',
+              maxWidth: 160
             }}>
               {pharmacyName}
             </span>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#059669', letterSpacing: '0.04em', textTransform: 'uppercase', marginTop: -1 }}>
+            <div className="hide-on-mobile" style={{ fontSize: 10, fontWeight: 700, color: '#059669', letterSpacing: '0.04em', textTransform: 'uppercase', marginTop: -1 }}>
               Sistem Apotek Modern
             </div>
           </div>
@@ -427,25 +431,123 @@ export function Header({
           display: 'flex',
           flexDirection: 'column',
           gap: 6
-        }} className="show-on-mobile">
+        }} className="show-on-mobile animate-fade-in">
           {navLinks.map(item => (
             <NavLink
               key={item.to}
               to={item.to}
               onClick={() => setShowMobileNav(false)}
               style={({ isActive }) => ({
-                padding: '10px 14px',
-                borderRadius: 10,
-                fontSize: 13,
+                padding: '11px 16px',
+                borderRadius: 12,
+                fontSize: 13.5,
                 fontWeight: isActive ? 800 : 600,
                 color: isActive ? '#047857' : '#475569',
                 background: isActive ? '#ecfdf5' : '#ffffff',
-                textDecoration: 'none'
+                textDecoration: 'none',
+                minHeight: 44,
+                display: 'flex',
+                alignItems: 'center'
               })}
             >
               {item.label}
             </NavLink>
           ))}
+
+          <div style={{ height: 1, background: '#f1f5f9', margin: '6px 0' }} />
+
+          {/* Shift status & action in mobile menu */}
+          {activeShift ? (
+            <button
+              type="button"
+              onClick={() => { setShowMobileNav(false); onCloseShiftModal(); }}
+              style={{
+                padding: '10px 14px',
+                borderRadius: 12,
+                fontSize: 13,
+                fontWeight: 700,
+                color: '#065f46',
+                background: '#ecfdf5',
+                border: '1px solid #a7f3d0',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                minHeight: 44
+              }}
+            >
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981' }} />
+              <span>Shift Aktif ({activeShift.shiftName}) &bull; Tutup Shift</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => { setShowMobileNav(false); onOpenShiftModal(); }}
+              style={{
+                padding: '10px 14px',
+                borderRadius: 12,
+                fontSize: 13,
+                fontWeight: 700,
+                color: '#b45309',
+                background: '#fffbeb',
+                border: '1px solid #fde68a',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                minHeight: 44
+              }}
+            >
+              <Clock size={15} color="#d97706" />
+              <span>Buka Shift Kerja</span>
+            </button>
+          )}
+
+          <Link
+            to="/store"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setShowMobileNav(false)}
+            style={{
+              padding: '10px 14px',
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#334155',
+              background: '#f8fafc',
+              textDecoration: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              minHeight: 44
+            }}
+          >
+            <Globe size={15} color="#059669" />
+            <span>Lihat Etalase Publik</span>
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => { setShowMobileNav(false); onLogout(); }}
+            style={{
+              padding: '10px 14px',
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: 700,
+              color: '#dc2626',
+              background: '#fef2f2',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              minHeight: 44,
+              textAlign: 'left'
+            }}
+          >
+            <LogOut size={15} />
+            <span>Keluar (Logout)</span>
+          </button>
         </div>
       )}
     </div>

@@ -118,14 +118,9 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%' }}>
       {/* ── BARIS 1: 2 KARTU UTAMA (PENJUALAN & PRIORITAS) ────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.35fr 1fr', gap: 18 }}>
+      <div className="dashboard-top-grid">
         {/* KARTU 1: Penjualan Hari Ini & Tab Tunai/QRIS */}
-        <div style={{
-          background: '#ffffff',
-          borderRadius: 22,
-          padding: '24px 28px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 4px 20px rgba(5, 150, 105, 0.04)',
+        <div className="dashboard-card" style={{
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
@@ -133,7 +128,7 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
         }}>
           <div>
             {/* Tab Filter Pembayaran Modern */}
-            <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
               {[
                 { id: 'ALL', label: 'Penjualan' },
                 { id: 'CASH', label: 'Kas tunai' },
@@ -166,7 +161,7 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
             <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 6px', fontWeight: 600 }}>
               Penjualan hari ini
             </p>
-            <div style={{ fontSize: '2.3rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.035em', lineHeight: 1.1 }}>
+            <div className="dashboard-big-number">
               {formatRupiah(displaySalesAmount)}
             </div>
             <p style={{ fontSize: 12.5, color: '#94a3b8', margin: '8px 0 0', fontWeight: 500 }}>
@@ -175,8 +170,8 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
           </div>
 
           {/* Tombol Aksi Cepat Buka Kasir & Laporan */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 22 }}>
-            <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 22, flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button
                 type="button"
                 onClick={() => navigate('/admin/pos')}
@@ -236,12 +231,7 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
         </div>
 
         {/* KARTU 2: Prioritas Apotek & Stok Menipis */}
-        <div style={{
-          background: '#ffffff',
-          borderRadius: 22,
-          padding: '24px 28px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 4px 20px rgba(5, 150, 105, 0.04)',
+        <div className="dashboard-card" style={{
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
@@ -332,14 +322,9 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
       </div>
 
       {/* ── BARIS 2: 3 KARTU SEIMBANG (PERSEDIAAN, KATEGORI, TRANSAKSI) ──── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
+      <div className="dashboard-bottom-grid">
         {/* KARTU 3: Persediaan & Donut Chart Kesehatan Stok */}
-        <div style={{
-          background: '#ffffff',
-          borderRadius: 22,
-          padding: '22px 24px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 4px 20px rgba(5, 150, 105, 0.04)',
+        <div className="dashboard-card" style={{
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between'
@@ -420,12 +405,7 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
         </div>
 
         {/* KARTU 4: Penjualan Menurut Kategori Obat */}
-        <div style={{
-          background: '#ffffff',
-          borderRadius: 22,
-          padding: '22px 24px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 4px 20px rgba(5, 150, 105, 0.04)',
+        <div className="dashboard-card" style={{
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between'
@@ -468,12 +448,7 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
         </div>
 
         {/* KARTU 5: Transaksi Kasir Real-Time */}
-        <div style={{
-          background: '#ffffff',
-          borderRadius: 22,
-          padding: '22px 24px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 4px 20px rgba(5, 150, 105, 0.04)',
+        <div className="dashboard-card" style={{
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between'
