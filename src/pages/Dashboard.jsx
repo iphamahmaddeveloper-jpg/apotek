@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { 
   ArrowUpRight, ShoppingCart, FileText, Package, AlertCircle, 
-  ChevronRight, ArrowRight, Clock, CheckCircle
+  ChevronRight, ArrowRight, Clock, CheckCircle, TrendingUp
 } from 'lucide-react';
 import { formatRupiah, formatDateTime, isSameDayInTimezone, getLocalDateString } from '../utils';
 import { useNavigate } from 'react-router-dom';
@@ -125,14 +125,14 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
           borderRadius: 22,
           padding: '24px 28px',
           border: '1px solid #e2e8f0',
-          boxShadow: '0 2px 14px rgba(0, 0, 0, 0.025)',
+          boxShadow: '0 4px 20px rgba(5, 150, 105, 0.04)',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
           position: 'relative'
         }}>
           <div>
-            {/* Tab Filter Pembayaran */}
+            {/* Tab Filter Pembayaran Modern */}
             <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
               {[
                 { id: 'ALL', label: 'Penjualan' },
@@ -147,11 +147,14 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
                     padding: '5px 14px',
                     borderRadius: 9999,
                     fontSize: 12,
-                    fontWeight: salesTab === tab.id ? 700 : 500,
+                    fontWeight: salesTab === tab.id ? 800 : 600,
                     color: salesTab === tab.id ? '#ffffff' : '#64748b',
-                    background: salesTab === tab.id ? '#0f172a' : '#f8fafc',
-                    border: `1px solid ${salesTab === tab.id ? '#0f172a' : '#e2e8f0'}`,
+                    background: salesTab === tab.id 
+                      ? 'linear-gradient(135deg, #059669 0%, #0d9488 100%)' 
+                      : '#f8fafc',
+                    border: `1px solid ${salesTab === tab.id ? '#059669' : '#e2e8f0'}`,
                     cursor: 'pointer',
+                    boxShadow: salesTab === tab.id ? '0 2px 8px rgba(5, 150, 105, 0.28)' : 'none',
                     transition: 'all 0.15s ease'
                   }}
                 >
@@ -178,15 +181,15 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
                 type="button"
                 onClick={() => navigate('/admin/pos')}
                 style={{
-                  background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                  background: 'linear-gradient(135deg, #059669 0%, #0d9488 100%)',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: 9999,
-                  padding: '7px 18px',
+                  padding: '7px 20px',
                   fontSize: 12.5,
-                  fontWeight: 700,
+                  fontWeight: 800,
                   cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(15, 23, 42, 0.2)'
+                  boxShadow: '0 3px 12px rgba(5, 150, 105, 0.3)'
                 }}
               >
                 Buka kasir
@@ -195,9 +198,9 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
                 type="button"
                 onClick={() => navigate('/admin/reports')}
                 style={{
-                  background: '#ffffff',
-                  color: '#0f172a',
-                  border: '1px solid #e2e8f0',
+                  background: '#ecfdf5',
+                  color: '#047857',
+                  border: '1px solid #a7f3d0',
                   borderRadius: 9999,
                   padding: '7px 18px',
                   fontSize: 12.5,
@@ -217,9 +220,9 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
                 width: 32,
                 height: 32,
                 borderRadius: '50%',
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                color: '#0f172a',
+                background: '#ecfdf5',
+                border: '1px solid #a7f3d0',
+                color: '#047857',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -238,7 +241,7 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
           borderRadius: 22,
           padding: '24px 28px',
           border: '1px solid #e2e8f0',
-          boxShadow: '0 2px 14px rgba(0, 0, 0, 0.025)',
+          boxShadow: '0 4px 20px rgba(5, 150, 105, 0.04)',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
@@ -247,9 +250,9 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
           <div>
             <span style={{
               display: 'inline-block',
-              background: '#fef2f2',
-              color: '#dc2626',
-              border: '1px solid #fecaca',
+              background: '#fef3c7',
+              color: '#b45309',
+              border: '1px solid #fde68a',
               borderRadius: 9999,
               padding: '2px 10px',
               fontSize: 11,
@@ -272,15 +275,15 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
             <div 
               onClick={() => navigate('/admin/inventory')}
               style={{
-                background: '#f8fafc',
+                background: '#fff7ed',
                 borderRadius: 14,
                 padding: '10px 14px',
                 cursor: 'pointer',
-                border: '1px solid #e2e8f0'
+                border: '1px solid #fed7aa'
               }}
             >
-              <p style={{ fontSize: 11.5, color: '#64748b', margin: 0, fontWeight: 500 }}>Stok sangat kritis</p>
-              <p style={{ fontSize: 14, fontWeight: 800, color: '#dc2626', margin: '4px 0 0' }}>
+              <p style={{ fontSize: 11.5, color: '#9a3412', margin: 0, fontWeight: 600 }}>Stok sangat kritis</p>
+              <p style={{ fontSize: 14, fontWeight: 900, color: '#c2410c', margin: '4px 0 0' }}>
                 {criticalStockProducts.length} produk
               </p>
             </div>
@@ -288,15 +291,15 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
             <div 
               onClick={() => navigate('/admin/inventory')}
               style={{
-                background: '#f8fafc',
+                background: '#ecfdf5',
                 borderRadius: 14,
                 padding: '10px 14px',
                 cursor: 'pointer',
-                border: '1px solid #e2e8f0'
+                border: '1px solid #a7f3d0'
               }}
             >
-              <p style={{ fontSize: 11.5, color: '#64748b', margin: 0, fontWeight: 500 }}>Faktur masuk PT</p>
-              <p style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', margin: '4px 0 0' }}>
+              <p style={{ fontSize: 11.5, color: '#065f46', margin: 0, fontWeight: 600 }}>Faktur masuk PT</p>
+              <p style={{ fontSize: 14, fontWeight: 900, color: '#047857', margin: '4px 0 0' }}>
                 {incomingGoods.length} Faktur (PO)
               </p>
             </div>
@@ -313,9 +316,9 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
               width: 32,
               height: 32,
               borderRadius: '50%',
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              color: '#0f172a',
+              background: '#ecfdf5',
+              border: '1px solid #a7f3d0',
+              color: '#047857',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -336,7 +339,7 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
           borderRadius: 22,
           padding: '22px 24px',
           border: '1px solid #e2e8f0',
-          boxShadow: '0 2px 14px rgba(0, 0, 0, 0.025)',
+          boxShadow: '0 4px 20px rgba(5, 150, 105, 0.04)',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between'
@@ -349,9 +352,9 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
               <button 
                 type="button" 
                 onClick={() => navigate('/admin/inventory')}
-                style={{ background: 'none', border: 'none', fontSize: 12, fontWeight: 700, color: '#0f172a', cursor: 'pointer', padding: 0 }}
+                style={{ background: 'none', border: 'none', fontSize: 12, fontWeight: 800, color: '#059669', cursor: 'pointer', padding: 0 }}
               >
-                Inventori
+                Inventori &rarr;
               </button>
             </div>
 
@@ -364,7 +367,7 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
                     cy="50"
                     r={radius}
                     fill="transparent"
-                    stroke="#f1f5f9"
+                    stroke="#ecfdf5"
                     strokeWidth="9"
                   />
                   <circle
@@ -372,7 +375,7 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
                     cy="50"
                     r={radius}
                     fill="transparent"
-                    stroke="#059669"
+                    stroke="#10b981"
                     strokeWidth="9"
                     strokeDasharray={circumference}
                     strokeDashoffset={strokeDashoffset}
@@ -411,7 +414,7 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
               <span style={{ color: '#64748b' }}>Stok kritis (&le;5 pcs)</span>
-              <span style={{ fontWeight: 800, color: '#0f172a' }}>{criticalStockProducts.length} produk</span>
+              <span style={{ fontWeight: 800, color: '#ea580c' }}>{criticalStockProducts.length} produk</span>
             </div>
           </div>
         </div>
@@ -422,7 +425,7 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
           borderRadius: 22,
           padding: '22px 24px',
           border: '1px solid #e2e8f0',
-          boxShadow: '0 2px 14px rgba(0, 0, 0, 0.025)',
+          boxShadow: '0 4px 20px rgba(5, 150, 105, 0.04)',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between'
@@ -432,7 +435,7 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
               <h3 style={{ fontSize: '0.975rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                 Penjualan
               </h3>
-              <span style={{ fontSize: 11.5, color: '#94a3b8', fontWeight: 600 }}>Hari ini</span>
+              <span style={{ background: '#ecfdf5', color: '#047857', borderRadius: 9999, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>Hari ini</span>
             </div>
 
             <div style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.025em', margin: '2px 0 4px' }}>
@@ -442,7 +445,7 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
               Kontribusi menurut kategori
             </p>
 
-            {/* List Kategori dengan Bar Progress */}
+            {/* List Kategori dengan Bar Progress Fresh Emerald-Cyan */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {categorySales.map((cat, idx) => (
                 <div key={idx}>
@@ -454,7 +457,7 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
                     <div style={{
                       width: `${cat.pct}%`,
                       height: '100%',
-                      background: 'linear-gradient(90deg, #0f172a 0%, #334155 100%)',
+                      background: 'linear-gradient(90deg, #059669 0%, #06b6d4 100%)',
                       borderRadius: 9999
                     }} />
                   </div>
@@ -470,7 +473,7 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
           borderRadius: 22,
           padding: '22px 24px',
           border: '1px solid #e2e8f0',
-          boxShadow: '0 2px 14px rgba(0, 0, 0, 0.025)',
+          boxShadow: '0 4px 20px rgba(5, 150, 105, 0.04)',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between'
@@ -483,9 +486,9 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
               <button 
                 type="button" 
                 onClick={() => navigate('/admin/reports')}
-                style={{ background: 'none', border: 'none', fontSize: 12, fontWeight: 700, color: '#0f172a', cursor: 'pointer', padding: 0 }}
+                style={{ background: 'none', border: 'none', fontSize: 12, fontWeight: 800, color: '#059669', cursor: 'pointer', padding: 0 }}
               >
-                Semua
+                Semua &rarr;
               </button>
             </div>
 
@@ -507,9 +510,9 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
                           width: 32,
                           height: 32,
                           borderRadius: '50%',
-                          background: '#f8fafc',
-                          color: '#0f172a',
-                          border: '1px solid #e2e8f0',
+                          background: '#ecfdf5',
+                          color: '#047857',
+                          border: '1px solid #a7f3d0',
                           fontSize: 11,
                           fontWeight: 800,
                           display: 'flex',
@@ -547,7 +550,7 @@ export function Dashboard({ products = [], transactions = [], incomingGoods = []
               style={{
                 background: 'none',
                 border: 'none',
-                color: '#0f172a',
+                color: '#059669',
                 fontSize: 12.5,
                 fontWeight: 800,
                 cursor: 'pointer',

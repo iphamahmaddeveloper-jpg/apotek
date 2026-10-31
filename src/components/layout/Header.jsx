@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { 
   Bell, ShoppingCart, Clock, Cross, LogOut, Globe, 
-  RotateCcw, ChevronDown, AlertTriangle, X, Menu
+  RotateCcw, ChevronDown, AlertTriangle, X, Menu, Sparkles
 } from 'lucide-react';
 import { ROLES } from '../../config/auth';
 
@@ -38,33 +38,38 @@ export function Header({
   return (
     <div className="top-pill-navbar animate-fade-in">
       <div className="top-pill-navbar-inner">
-        {/* Left: Brand Identity */}
+        {/* Left: Brand Identity with Fresh Emerald-Teal Gradient */}
         <Link 
           to={isOwner ? "/admin/dashboard" : "/admin/pos"} 
-          style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 11, textDecoration: 'none', flexShrink: 0 }}
         >
           <div style={{
-            width: 36,
-            height: 36,
+            width: 38,
+            height: 38,
             borderRadius: 12,
-            background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+            background: 'linear-gradient(135deg, #059669 0%, #0d9488 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 3px 10px rgba(15, 23, 42, 0.2)',
+            boxShadow: '0 4px 14px rgba(5, 150, 105, 0.3)',
             flexShrink: 0
           }}>
-            <Cross size={18} color="#ffffff" strokeWidth={2.6} />
+            <Cross size={20} color="#ffffff" strokeWidth={2.6} />
           </div>
-          <span style={{
-            fontSize: '1.025rem',
-            fontWeight: 800,
-            color: '#0f172a',
-            letterSpacing: '-0.02em',
-            whiteSpace: 'nowrap'
-          }}>
-            {pharmacyName}
-          </span>
+          <div>
+            <span style={{
+              fontSize: '1.025rem',
+              fontWeight: 800,
+              color: '#0f172a',
+              letterSpacing: '-0.02em',
+              whiteSpace: 'nowrap'
+            }}>
+              {pharmacyName}
+            </span>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#059669', letterSpacing: '0.04em', textTransform: 'uppercase', marginTop: -1 }}>
+              Sistem Apotek Modern
+            </div>
+          </div>
         </Link>
 
         {/* Center: Desktop Navigation Pills */}
@@ -78,9 +83,9 @@ export function Header({
                 borderRadius: 9999,
                 fontSize: 13,
                 fontWeight: isActive ? 800 : 600,
-                color: isActive ? '#0f172a' : '#64748b',
-                background: isActive ? '#f1f5f9' : 'transparent',
-                border: isActive ? '1px solid #e2e8f0' : '1px solid transparent',
+                color: isActive ? '#047857' : '#64748b',
+                background: isActive ? '#ecfdf5' : 'transparent',
+                border: isActive ? '1px solid #a7f3d0' : '1px solid transparent',
                 textDecoration: 'none',
                 transition: 'all 0.15s ease',
                 whiteSpace: 'nowrap'
@@ -101,9 +106,9 @@ export function Header({
               className="btn btn-sm hide-on-mobile"
               style={{
                 borderRadius: 9999,
-                background: '#f0fdf4',
-                border: '1px solid #bbf7d0',
-                color: '#15803d',
+                background: '#ecfdf5',
+                border: '1px solid #a7f3d0',
+                color: '#065f46',
                 fontSize: 12,
                 fontWeight: 700,
                 padding: '6px 12px',
@@ -111,7 +116,7 @@ export function Header({
               }}
               title="Shift kasir aktif. Klik untuk rekapitulasi & tutup shift"
             >
-              <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#16a34a' }} />
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981' }} />
               <span>{activeShift.shiftName.split(' ')[0]} {activeShift.shiftName.split(' ')[1] || ''}</span>
             </button>
           ) : (
@@ -148,9 +153,9 @@ export function Header({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: lowStockProducts.length > 0 ? '#fef2f2' : '#f8fafc',
-                border: `1.5px solid ${lowStockProducts.length > 0 ? '#fecaca' : '#e2e8f0'}`,
-                color: lowStockProducts.length > 0 ? '#dc2626' : '#64748b',
+                background: lowStockProducts.length > 0 ? '#fff1f2' : '#f8fafc',
+                border: `1.5px solid ${lowStockProducts.length > 0 ? '#fecdd3' : '#e2e8f0'}`,
+                color: lowStockProducts.length > 0 ? '#e11d48' : '#64748b',
                 cursor: 'pointer',
                 position: 'relative'
               }}
@@ -164,7 +169,7 @@ export function Header({
                   right: -2,
                   width: 16,
                   height: 16,
-                  background: '#dc2626',
+                  background: '#e11d48',
                   color: '#ffffff',
                   fontSize: 9.5,
                   fontWeight: 900,
@@ -227,7 +232,7 @@ export function Header({
             )}
           </div>
 
-          {/* Primary Outstanding CTA: KASIR PILL BUTTON (Clean Slate Dark) */}
+          {/* Primary Outstanding CTA: FRESH VIBRANT EMERALD-TEAL KASIR PILL BUTTON */}
           <NavLink
             to="/admin/pos"
             style={({ isActive }) => ({
@@ -235,20 +240,20 @@ export function Header({
               alignItems: 'center',
               gap: 7,
               background: isActive 
-                ? '#020617' 
-                : 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                ? 'linear-gradient(135deg, #047857 0%, #0f766e 100%)' 
+                : 'linear-gradient(135deg, #059669 0%, #0d9488 100%)',
               color: '#ffffff',
-              padding: '8px 20px',
+              padding: '8px 22px',
               borderRadius: 9999,
               fontSize: 13,
               fontWeight: 800,
               textDecoration: 'none',
-              boxShadow: '0 3px 12px rgba(15, 23, 42, 0.25)',
+              boxShadow: '0 4px 16px rgba(13, 148, 136, 0.35)',
               transition: 'all 0.15s ease',
               whiteSpace: 'nowrap'
             })}
           >
-            <ShoppingCart size={15} color="#ffffff" strokeWidth={2.3} />
+            <ShoppingCart size={15} color="#ffffff" strokeWidth={2.4} />
             <span>Kasir</span>
           </NavLink>
 
@@ -272,7 +277,7 @@ export function Header({
                 width: 28,
                 height: 28,
                 borderRadius: '50%',
-                background: isOwner ? '#0f172a' : '#059669',
+                background: isOwner ? 'linear-gradient(135deg, #059669 0%, #0284c7 100%)' : '#0d9488',
                 color: '#ffffff',
                 fontSize: 11,
                 fontWeight: 800,
@@ -307,7 +312,7 @@ export function Header({
                 }}>
                   <div style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', marginBottom: 6 }}>
                     <div style={{ fontWeight: 800, color: '#0f172a', fontSize: 13 }}>{currentUser?.name}</div>
-                    <div style={{ fontSize: 11, color: isOwner ? '#0f172a' : '#059669', fontWeight: 700, marginTop: 2 }}>
+                    <div style={{ fontSize: 11, color: isOwner ? '#059669' : '#0d9488', fontWeight: 700, marginTop: 2 }}>
                       {isOwner ? '👑 Pemilik Apotek (Owner)' : '💼 Petugas Kasir Shift'}
                     </div>
                   </div>
@@ -433,8 +438,8 @@ export function Header({
                 borderRadius: 10,
                 fontSize: 13,
                 fontWeight: isActive ? 800 : 600,
-                color: isActive ? '#0f172a' : '#475569',
-                background: isActive ? '#f1f5f9' : '#ffffff',
+                color: isActive ? '#047857' : '#475569',
+                background: isActive ? '#ecfdf5' : '#ffffff',
                 textDecoration: 'none'
               })}
             >
