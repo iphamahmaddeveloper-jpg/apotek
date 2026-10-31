@@ -51,6 +51,8 @@ function MainApp() {
   const [users, setUsers] = useState(() => storage.getUsers());
   const [shifts, setShifts] = useState(() => storage.getShifts());
   const [activeShift, setActiveShift] = useState(() => storage.getActiveShift());
+  const [members, setMembers] = useState(() => storage.getMembers());
+  const [stockOpnames, setStockOpnames] = useState(() => storage.getStockOpnames());
 
   // Modal states for Shifts
   const [isOpenShiftModalOpen, setIsOpenShiftModalOpen] = useState(false);
@@ -76,6 +78,14 @@ function MainApp() {
   useEffect(() => {
     storage.setShifts(shifts);
   }, [shifts]);
+
+  useEffect(() => {
+    storage.setMembers(members);
+  }, [members]);
+
+  useEffect(() => {
+    storage.setStockOpnames(stockOpnames);
+  }, [stockOpnames]);
 
   // Multi-tab synchronization
   useEffect(() => {
@@ -167,6 +177,66 @@ function MainApp() {
       });
     });
     toast.success(`Faktur masuk ${newIncoming.invoice_number} berhasil dicatat.`);
+  };
+
+  // Pembatalan Faktur Penjualan (Void/Retur Obat)
+  const handleVoidTransaction = (trxId, reason = 'Pasien ingin ganti obat/batal') => {
+    const target = transactions.find(t => (t.id === trxId || t.invoice_no === trxId));
+    if (!target) {
+      toast.error(`Faktur ${trxId} tidak ditemukan.`);
+      return false;
+    }
+    if (target.is_void) {
+      toast.warning(`Faktur ${trxId} sudah dibatalkan sebelumnya.`);
+      return false;
+    }
+
+    // 1. Tandai transaksi sebagai BATAL (VOID)
+    setTransactions(prev => prev.map(t => {
+      if (t.id === target.id) {
+        return {
+          ...t,
+          is_void: true,
+          void_at: new Date().toISOString(),
+          void_by: currentUser?.name || 'Petugas Apotek',
+          void_reason: reason
+        };
+      }
+      return t;
+    }));
+
+    // 2. Kembalikan stok obat secara otomatis ke inventori rak apotek
+    if (Array.isArray(target.items)) {
+      setProducts(prevProducts => {
+        return prevProducts.map(p => {
+          const item = target.items.find(i => i.id === p.id);
+          if (item) {
+            return { ...p, stock: p.stock + (parseInt(item.qty, 10) || 0) };
+          }
+          return p;
+        });
+      });
+    }
+
+    toast.success(`Faktur ${target.invoice_no || target.id} berhasil DIBATALKAN. Stok obat telah dikembalikan ke inventori rak.`);
+    return true;
+  };
+
+  // Simpan Sesi / Lembar Cek Fisik & Stok Opname
+  const handleSaveStockOpname = (soRecord, shouldAdjustStock = false) => {
+    setStockOpnames(prev => [soRecord, ...prev]);
+
+    if (shouldAdjustStock && soRecord.productId) {
+      setProducts(prev => prev.map(p => {
+        if (p.id === soRecord.productId) {
+          return { ...p, stock: soRecord.physicalStock };
+        }
+        return p;
+      }));
+      toast.success(`Stok sistem ${soRecord.productName} berhasil disinkronkan ke stok fisik (${soRecord.physicalStock} unit).`);
+    } else {
+      toast.success(`Catatan cek fisik ${soRecord.productName} berhasil disimpan.`);
+    }
   };
 
   // Shift Handlers
@@ -270,6 +340,8 @@ function MainApp() {
                   onEditProduct={handleEditProduct} 
                   incomingGoods={incomingGoods}
                   onAddIncomingGoods={handleAddIncomingGoods}
+                  stockOpnames={stockOpnames}
+                  onSaveStockOpname={handleSaveStockOpname}
                   settings={settings}
                   currentUser={currentUser}
                 />
@@ -295,6 +367,7 @@ function MainApp() {
               >
                 <POS 
                   products={products} 
+                  members={members}
                   onTransactionComplete={handleTransactionComplete}
                   onCheckout={handleTransactionComplete}
                   settings={settings}
@@ -308,11 +381,11 @@ function MainApp() {
           } 
         />
 
-        {/* Laporan Penjualan (Owner Only) */}
+        {/* Laporan Penjualan & Pembatalan Faktur (Owner & Staff) */}
         <Route 
           path="/admin/reports" 
           element={
-            <ProtectedRoute currentUser={currentUser} users={users} allowedRoles={[ROLES.OWNER]}>
+            <ProtectedRoute currentUser={currentUser} users={users}>
               <Layout 
                 settings={settings} 
                 products={products}
@@ -326,6 +399,10 @@ function MainApp() {
                 <Reports 
                   transactions={transactions} 
                   incomingGoods={incomingGoods}
+                  products={products}
+                  stockOpnames={stockOpnames}
+                  currentUser={currentUser}
+                  onVoidTransaction={handleVoidTransaction}
                   settings={settings} 
                 />
               </Layout>

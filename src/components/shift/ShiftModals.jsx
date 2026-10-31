@@ -165,7 +165,9 @@ export function CloseShiftModal({ isOpen, onClose, activeShift, transactions = [
   if (!isOpen || !activeShift) return null;
 
   // Calculate live numbers for transactions created during this active shift
-  const shiftTransactions = transactions.filter(t => t.shiftId === activeShift.id);
+  const shiftTransactions = transactions.filter(t => 
+    !t.is_void && (t.shiftId === activeShift.id || (activeShift.startTime && new Date(t.date) >= new Date(activeShift.startTime)))
+  );
   
   const cashSales = shiftTransactions
     .filter(t => (t.payment_method || 'Tunai').toLowerCase() === 'tunai')
@@ -175,6 +177,7 @@ export function CloseShiftModal({ isOpen, onClose, activeShift, transactions = [
     .filter(t => (t.payment_method || 'Tunai').toLowerCase() !== 'tunai')
     .reduce((acc, t) => acc + (t.total || 0), 0);
 
+  const totalOmzet = cashSales + nonCashSales;
   const expectedCash = (activeShift.initialCash || 0) + cashSales;
   const countedCash = actualCash !== '' ? parseInt(actualCash, 10) : null;
   const diff = countedCash !== null && !isNaN(countedCash) ? countedCash - expectedCash : null;
@@ -229,33 +232,86 @@ export function CloseShiftModal({ isOpen, onClose, activeShift, transactions = [
         <form onSubmit={handleCloseShift} className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Automatic Calculation Card */}
           <div style={{
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: 12,
-            padding: '14px 16px',
+            background: '#ffffff',
+            border: '1.5px solid #e2e8f0',
+            borderRadius: 14,
+            padding: '16px',
             display: 'flex',
             flexDirection: 'column',
-            gap: 8,
+            gap: 10,
             fontSize: 13
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#64748b' }}>1. Modal Kas Awal di Laci</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#64748b', fontWeight: 600 }}>Total Transaksi Selesai</span>
+              <span style={{ fontWeight: 800, color: '#0f172a' }}>{shiftTransactions.length} Transaksi</span>
+            </div>
+
+            <div style={{ height: 1, background: '#f1f5f9' }} />
+
+            {/* Pendapatan Tunai & QRIS */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 10, padding: '10px 12px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#047857', textTransform: 'uppercase' }}>
+                  💵 Pendapatan Tunai
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 900, color: '#065f46', marginTop: 2 }}>
+                  {formatRupiah(cashSales)}
+                </div>
+                <div style={{ fontSize: 10.5, color: '#059669', marginTop: 1 }}>
+                  Uang tunai kasir
+                </div>
+              </div>
+
+              <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10, padding: '10px 12px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#0369a1', textTransform: 'uppercase' }}>
+                  📱 Pembayaran QRIS
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 900, color: '#075985', marginTop: 2 }}>
+                  {formatRupiah(nonCashSales)}
+                </div>
+                <div style={{ fontSize: 10.5, color: '#0284c7', marginTop: 1 }}>
+                  Masuk rekening bank
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '8px 12px', borderRadius: 8 }}>
+              <span style={{ color: '#64748b', fontSize: 12 }}>Total Omzet Shift Ini (Tunai + QRIS):</span>
+              <span style={{ fontWeight: 800, color: '#0f172a', fontSize: 13 }}>{formatRupiah(totalOmzet)}</span>
+            </div>
+
+            <div style={{ height: 1, background: '#e2e8f0' }} />
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: '#64748b' }}>
+              <span>Modal Awal Kas di Laci:</span>
               <span style={{ fontWeight: 700, color: '#1e293b' }}>{formatRupiah(activeShift.initialCash || 0)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#64748b' }}>2. Penjualan Tunai ({shiftTransactions.length} Trx)</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: '#64748b' }}>
+              <span>+ Penerimaan Uang Tunai:</span>
               <span style={{ fontWeight: 700, color: '#16a34a' }}>+{formatRupiah(cashSales)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#64748b' }}>3. Penjualan QRIS / Non-Tunai</span>
-              <span style={{ fontWeight: 700, color: '#6366f1' }}>{formatRupiah(nonCashSales)}</span>
-            </div>
 
-            <div style={{ height: 1, background: '#cbd5e1', margin: '4px 0' }} />
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, fontWeight: 800 }}>
-              <span style={{ color: '#0f172a' }}>Ekspektasi Uang Tunai di Laci</span>
-              <span style={{ color: '#0f172a' }}>{formatRupiah(expectedCash)}</span>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'baseline',
+              padding: '10px 12px',
+              background: '#f8fafc',
+              border: '1.5px solid #cbd5e1',
+              borderRadius: 10,
+              marginTop: 2
+            }}>
+              <div>
+                <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', display: 'block' }}>
+                  Total Wajib Ada di Laci Fisik:
+                </span>
+                <span style={{ fontSize: 11, color: '#64748b' }}>
+                  (Modal Awal + Hasil Penjualan Tunai)
+                </span>
+              </div>
+              <span style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
+                {formatRupiah(expectedCash)}
+              </span>
             </div>
           </div>
 

@@ -28,11 +28,11 @@ export function Header({
   const navLinks = [
     ...(isOwner ? [{ to: '/admin/dashboard', label: 'Dashboard' }] : []),
     { to: '/admin/inventory', label: 'Inventori' },
+    { to: '/admin/inventory?tab=incoming', label: 'Pembelian PBF' },
+    { to: '/admin/inventory?tab=opname', label: 'Stok Opname' },
+    { to: '/admin/reports', label: 'Laporan & Void' },
     { to: '/admin/shifts', label: 'Shift & Kas' },
-    ...(isOwner ? [
-      { to: '/admin/reports', label: 'Laporan' },
-      { to: '/admin/staff', label: 'Karyawan' }
-    ] : [])
+    ...(isOwner ? [{ to: '/admin/staff', label: 'Karyawan' }] : [])
   ];
 
   return (
@@ -425,38 +425,199 @@ export function Header({
           marginTop: 10,
           background: '#ffffff',
           borderRadius: 20,
-          padding: 14,
+          padding: 16,
           border: '1px solid #e2e8f0',
           boxShadow: '0 8px 30px rgba(0,0,0,0.06)',
           display: 'flex',
           flexDirection: 'column',
           gap: 6
         }} className="show-on-mobile animate-fade-in">
-          {navLinks.map(item => (
+          <p style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px 4px' }}>
+            Menu Alur Kerja Apotek
+          </p>
+
+          <NavLink
+            to="/admin/pos"
+            onClick={() => setShowMobileNav(false)}
+            style={{
+              padding: '11px 16px',
+              borderRadius: 12,
+              fontSize: 13.5,
+              fontWeight: 800,
+              color: '#ffffff',
+              background: 'linear-gradient(135deg, #059669 0%, #0d9488 100%)',
+              textDecoration: 'none',
+              minHeight: 44,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              boxShadow: '0 4px 12px rgba(5, 150, 105, 0.25)'
+            }}
+          >
+            <ShoppingCart size={16} />
+            <span>2. Penjualan Obat (Kasir POS)</span>
+          </NavLink>
+
+          {isOwner && (
             <NavLink
-              key={item.to}
-              to={item.to}
+              to="/admin/dashboard"
               onClick={() => setShowMobileNav(false)}
               style={({ isActive }) => ({
-                padding: '11px 16px',
+                padding: '10px 16px',
                 borderRadius: 12,
-                fontSize: 13.5,
+                fontSize: 13,
                 fontWeight: isActive ? 800 : 600,
-                color: isActive ? '#047857' : '#475569',
-                background: isActive ? '#ecfdf5' : '#ffffff',
+                color: isActive ? '#047857' : '#334155',
+                background: isActive ? '#ecfdf5' : '#f8fafc',
                 textDecoration: 'none',
-                minHeight: 44,
+                minHeight: 42,
                 display: 'flex',
                 alignItems: 'center'
               })}
             >
-              {item.label}
+              Dashboard Owner
             </NavLink>
-          ))}
+          )}
+
+          <NavLink
+            to="/admin/reports"
+            onClick={() => setShowMobileNav(false)}
+            style={({ isActive }) => ({
+              padding: '10px 16px',
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: isActive ? 800 : 600,
+              color: isActive ? '#047857' : '#334155',
+              background: isActive ? '#ecfdf5' : '#f8fafc',
+              textDecoration: 'none',
+              minHeight: 42,
+              display: 'flex',
+              alignItems: 'center'
+            })}
+          >
+            3. Laporan Penjualan Obat
+          </NavLink>
+
+          <NavLink
+            to="/admin/reports"
+            onClick={() => setShowMobileNav(false)}
+            style={{
+              padding: '10px 16px',
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#b91c1c',
+              background: '#fff5f5',
+              textDecoration: 'none',
+              minHeight: 42,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6
+            }}
+          >
+            <span>4. Hapus / Batal Penjualan (Void)</span>
+          </NavLink>
+
+          <NavLink
+            to="/admin/inventory?tab=incoming"
+            onClick={() => setShowMobileNav(false)}
+            style={{
+              padding: '10px 16px',
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#334155',
+              background: '#f8fafc',
+              textDecoration: 'none',
+              minHeight: 42,
+              display: 'flex',
+              alignItems: 'center'
+            }}
+          >
+            5. Pembelian Obat (Faktur Masuk PBF)
+          </NavLink>
+
+          <NavLink
+            to="/admin/inventory?tab=opname"
+            onClick={() => setShowMobileNav(false)}
+            style={{
+              padding: '10px 16px',
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#334155',
+              background: '#f8fafc',
+              textDecoration: 'none',
+              minHeight: 42,
+              display: 'flex',
+              alignItems: 'center'
+            }}
+          >
+            6. Stok Opname (Cek Fisik per Rak)
+          </NavLink>
+
+          <NavLink
+            to="/admin/inventory?tab=opname"
+            onClick={() => setShowMobileNav(false)}
+            style={{
+              padding: '10px 16px',
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#334155',
+              background: '#f8fafc',
+              textDecoration: 'none',
+              minHeight: 42,
+              display: 'flex',
+              alignItems: 'center'
+            }}
+          >
+            7. Laporan Stok Opname (Lap SO)
+          </NavLink>
+
+          <NavLink
+            to="/admin/inventory"
+            onClick={() => setShowMobileNav(false)}
+            style={{
+              padding: '10px 16px',
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#334155',
+              background: '#f8fafc',
+              textDecoration: 'none',
+              minHeight: 42,
+              display: 'flex',
+              alignItems: 'center'
+            }}
+          >
+            8. Katalog Obat & Rak Apotek
+          </NavLink>
+
+          {isOwner && (
+            <NavLink
+              to="/admin/staff"
+              onClick={() => setShowMobileNav(false)}
+              style={({ isActive }) => ({
+                padding: '10px 16px',
+                borderRadius: 12,
+                fontSize: 13,
+                fontWeight: isActive ? 800 : 600,
+                color: isActive ? '#047857' : '#334155',
+                background: isActive ? '#ecfdf5' : '#f8fafc',
+                textDecoration: 'none',
+                minHeight: 42,
+                display: 'flex',
+                alignItems: 'center'
+              })}
+            >
+              Kelola Karyawan (Owner)
+            </NavLink>
+          )}
 
           <div style={{ height: 1, background: '#f1f5f9', margin: '6px 0' }} />
 
-          {/* Shift status & action in mobile menu */}
+          {/* 1. Buka Tutup Shift Kasir */}
           {activeShift ? (
             <button
               type="button"
@@ -477,7 +638,7 @@ export function Header({
               }}
             >
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981' }} />
-              <span>Shift Aktif ({activeShift.shiftName}) &bull; Tutup Shift</span>
+              <span>1. Tutup Shift Kasir ({activeShift.shiftName})</span>
             </button>
           ) : (
             <button
@@ -499,7 +660,7 @@ export function Header({
               }}
             >
               <Clock size={15} color="#d97706" />
-              <span>Buka Shift Kerja</span>
+              <span>1. Buka Shift Kasir Baru</span>
             </button>
           )}
 

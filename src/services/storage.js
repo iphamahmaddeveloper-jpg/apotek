@@ -1,4 +1,4 @@
-import { mockProducts, mockTransactions, mockIncomingGoods } from '../mockData';
+import { mockProducts, mockTransactions, mockIncomingGoods, mockMembers, mockStockOpnameRecords } from '../mockData';
 import { defaultSettings } from '../config/settings';
 import { DEFAULT_USERS, ROLES } from '../config/auth';
 
@@ -10,7 +10,9 @@ const KEYS = {
   USER: 'apotek_user_v3',
   USERS: 'apotek_users_list_v3',
   SHIFTS: 'apotek_shifts_v3',
-  ACTIVE_SHIFT: 'apotek_active_shift_v3'
+  ACTIVE_SHIFT: 'apotek_active_shift_v3',
+  MEMBERS: 'apotek_members_v3',
+  STOCK_OPNAME: 'apotek_stock_opname_v3'
 };
 
 // Safe JSON parser
@@ -106,6 +108,12 @@ export const storage = {
   getActiveShift: () => safeGet(KEYS.ACTIVE_SHIFT, null),
   setActiveShift: (data) => safeSet(KEYS.ACTIVE_SHIFT, data),
 
+  getMembers: () => safeGet(KEYS.MEMBERS, mockMembers),
+  setMembers: (data) => safeSet(KEYS.MEMBERS, data),
+
+  getStockOpnames: () => safeGet(KEYS.STOCK_OPNAME, mockStockOpnameRecords),
+  setStockOpnames: (data) => safeSet(KEYS.STOCK_OPNAME, data),
+
   resetToDefault: () => {
     try {
       localStorage.removeItem(KEYS.PRODUCTS);
@@ -116,6 +124,8 @@ export const storage = {
       localStorage.removeItem(KEYS.USERS);
       localStorage.removeItem(KEYS.SHIFTS);
       localStorage.removeItem(KEYS.ACTIVE_SHIFT);
+      localStorage.removeItem(KEYS.MEMBERS);
+      localStorage.removeItem(KEYS.STOCK_OPNAME);
       window.location.reload();
     } catch (e) {
       console.error(e);
