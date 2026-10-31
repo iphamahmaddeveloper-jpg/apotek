@@ -1,4 +1,3 @@
-import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 
 export function Layout({ 
@@ -9,32 +8,25 @@ export function Layout({
   activeShift, 
   onOpenShiftModal, 
   onCloseShiftModal, 
-  onLogout,
+  onLogout, 
   onResetDemo 
 }) {
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f5f6fa' }}>
-      <Sidebar 
+    <div className="main-layout">
+      {/* Sleek Floating Top-Pill Navbar matching modern SaaS apotek */}
+      <Header 
         settings={settings} 
+        products={products} 
         currentUser={currentUser} 
         activeShift={activeShift} 
+        onOpenShiftModal={onOpenShiftModal} 
+        onCloseShiftModal={onCloseShiftModal} 
         onLogout={onLogout} 
+        onResetDemo={onResetDemo}
       />
-      <div className="main-layout">
-        <Header 
-          settings={settings} 
-          products={products} 
-          currentUser={currentUser} 
-          activeShift={activeShift} 
-          onOpenShiftModal={onOpenShiftModal} 
-          onCloseShiftModal={onCloseShiftModal} 
-          onLogout={onLogout} 
-          onResetDemo={onResetDemo}
-        />
-        <main className="page-container animate-fade-in">
-          {children}
-        </main>
-      </div>
+      <main className="page-container animate-fade-in">
+        {children}
+      </main>
     </div>
   );
 }

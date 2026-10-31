@@ -1,15 +1,17 @@
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { 
-  DollarSign, TrendingUp, AlertTriangle, Activity, 
-  ShoppingCart, Truck, Plus, FileText, ArrowRight, CheckCircle, 
-  Clock, Award, Layers, Banknote, ShieldCheck, RefreshCw
+  ArrowUpRight, ShoppingCart, FileText, Package, AlertCircle, 
+  ChevronRight, ArrowRight, Clock, CheckCircle
 } from 'lucide-react';
-import { formatRupiah, isSameDayInTimezone, getLocalDateString } from '../utils';
+import { formatRupiah, formatDateTime, isSameDayInTimezone, getLocalDateString } from '../utils';
 import { useNavigate } from 'react-router-dom';
 
-export function Dashboard({ products = [], transactions = [], incomingGoods: _incomingGoods = [], settings }) {
+export function Dashboard({ products = [], transactions = [], incomingGoods = [], settings }) {
   const navigate = useNavigate();
   const tz = settings?.timezone || 'Asia/Makassar';
+
+  // State tab pembayaran di Card 1: 'ALL' | 'CASH' | 'QRIS'
+  const [salesTab, setSalesTab] = useState('ALL');
 
   // Transaksi Hari Ini
   const todayTransactions = useMemo(() =>
@@ -33,8 +35,7 @@ export function Dashboard({ products = [], transactions = [], incomingGoods: _in
   );
 
   const totalProfitToday = totalSalesToday - totalHppToday;
-  const marginPct = totalSalesToday > 0 ? ((totalProfitToday / totalSalesToday) * 100).toFixed(1) : '0.0';
-  
+
   // Breakdown Pembayaran Hari Ini
   const paymentBreakdown = useMemo(() => {
     let tunai = 0;
@@ -49,477 +50,515 @@ export function Dashboard({ products = [], transactions = [], incomingGoods: _in
     return { tunai, nonTunai };
   }, [todayTransactions]);
 
-  // Perhitungan Nilai Aset Stok
-  const totalAssetValue = useMemo(() => 
-    products.reduce((acc, p) => acc + ((p.buy_price || 0) * (p.stock || 0)), 0),
-    [products]
-  );
+  // Nominal yang ditampilkan di Card 1 sesuai tab
+  const displaySalesAmount = useMemo(() => {
+    if (salesTab === 'CASH') return paymentBreakdown.tunai;
+    if (salesTab === 'QRIS') return paymentBreakdown.nonTunai;
+    return totalSalesToday;
+  }, [salesTab, totalSalesToday, paymentBreakdown]);
 
-  const totalUnits = useMemo(() => 
-    products.reduce((acc, p) => acc + (p.stock || 0), 0),
-    [products]
-  );
+  const avgPerTrx = todayTransactions.length > 0 ? Math.round(totalSalesToday / todayTransactions.length) : 0;
 
+  // Analisis Stok Obat
   const lowStockProducts = useMemo(() => 
     products.filter(p => p.stock < (p.min_stock || 10)), 
     [products]
   );
 
-  // 7-day Sales Data
-  const weeklySalesData = useMemo(() => {
-    const now = new Date();
-    const days = [];
-    let weekTotal = 0;
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now.getTime() - i * 86400000);
-      const dateStr = getLocalDateString(d, tz);
-      const label = new Intl.DateTimeFormat('id-ID', { timeZone: tz, weekday: 'short' }).format(d);
-      const dayTrxs = transactions.filter(t => getLocalDateString(t.date, tz) === dateStr);
-      const amount = dayTrxs.reduce((s, t) => s + (t.total || 0), 0);
-      const hpp = dayTrxs.reduce((s, t) => {
-        if (t.total_hpp !== undefined) return s + t.total_hpp;
-        if (Array.isArray(t.items)) return s + t.items.reduce((ss, i) => ss + ((i.buy_price || 0) * (i.qty || 1)), 0);
-        return s;
-      }, 0);
-      weekTotal += amount;
-      days.push({ day: label, dateStr, amount, profit: amount - hpp, isToday: i === 0 });
-    }
-    const max = Math.max(...days.map(d => d.amount), 1);
-    return {
-      items: days.map(d => ({ ...d, pct: d.amount > 0 ? Math.max(14, Math.round((d.amount / max) * 100)) : 8 })),
-      weekTotal,
-      avgDaily: Math.round(weekTotal / 7)
-    };
-  }, [transactions, tz]);
+  const criticalStockProducts = useMemo(() => 
+    products.filter(p => p.stock <= 5), 
+    [products]
+  );
 
-  // Fast-Moving Medicines (Top Selling Products)
-  const topSellingProducts = useMemo(() => {
-    const counts = {};
-    transactions.forEach(t => {
+  const safeStockCount = Math.max(0, products.length - lowStockProducts.length);
+  const safeStockPct = products.length > 0 ? Math.round((safeStockCount / products.length) * 100) : 100;
+
+  // Kontribusi Penjualan Menurut Kategori Obat
+  const categorySales = useMemo(() => {
+    const catMap = {};
+    const sourceTrxs = todayTransactions.length > 0 ? todayTransactions : transactions;
+    sourceTrxs.forEach(t => {
       if (Array.isArray(t.items)) {
         t.items.forEach(it => {
-          if (!counts[it.id]) {
-            counts[it.id] = { id: it.id, name: it.name, totalQty: 0, revenue: 0 };
-          }
-          counts[it.id].totalQty += (it.qty || 1);
-          counts[it.id].revenue += ((it.price || 0) * (it.qty || 1));
+          const prod = products.find(p => p.id === it.id);
+          const cat = prod?.category || it.category || 'Obat Bebas';
+          catMap[cat] = (catMap[cat] || 0) + (it.price * (it.qty || 1));
         });
       }
     });
-    const sorted = Object.values(counts).sort((a, b) => b.totalQty - a.totalQty).slice(0, 5);
-    const maxQty = Math.max(...sorted.map(s => s.totalQty), 1);
-    return sorted.map(s => ({
-      ...s,
-      pct: Math.round((s.totalQty / maxQty) * 100),
-      prod: products.find(p => p.id === s.id)
-    }));
-  }, [transactions, products]);
 
-  // Stat Cards Config
-  const statCards = [
-    {
-      label: 'Pendapatan Hari Ini',
-      value: formatRupiah(totalSalesToday),
-      sub: `${todayTransactions.length} transaksi kasir tercatat`,
-      badge: '+18.4%',
-      badgeType: 'badge-green',
-      icon: DollarSign,
-      iconBg: '#eff6ff',
-      iconColor: '#2563eb',
-    },
-    {
-      label: 'Laba Bersih Hari Ini',
-      value: formatRupiah(totalProfitToday),
-      sub: `HPP Modal: ${formatRupiah(totalHppToday)}`,
-      badge: `Margin ${marginPct}%`,
-      badgeType: 'badge-indigo',
-      icon: TrendingUp,
-      iconBg: '#f0fdf4',
-      iconColor: '#16a34a',
-    },
-    {
-      label: 'Nilai Aset Stok Obat',
-      value: formatRupiah(totalAssetValue),
-      sub: `Total ${totalUnits} pcs (${products.length} varian obat)`,
-      badge: 'Modal Rak',
-      badgeType: 'badge-gray',
-      icon: Layers,
-      iconBg: '#f8fafc',
-      iconColor: '#475569',
-    },
-    {
-      label: 'Stok Perlu Restock',
-      value: `${lowStockProducts.length} Obat`,
-      sub: lowStockProducts.length > 0 ? 'Segera buat pesanan ke distributor PT' : 'Semua stok dalam batas aman',
-      badge: lowStockProducts.length > 0 ? `${lowStockProducts.length} Kritis` : 'Aman',
-      badgeType: lowStockProducts.length > 0 ? 'badge-amber' : 'badge-green',
-      icon: AlertTriangle,
-      iconBg: lowStockProducts.length > 0 ? '#fff7ed' : '#f0fdf4',
-      iconColor: lowStockProducts.length > 0 ? '#d97706' : '#16a34a',
-      danger: lowStockProducts.length > 0,
-    },
-  ];
+    // Fallback jika belum ada transaksi di sistem
+    if (Object.keys(catMap).length === 0) {
+      catMap['Suplemen & Vitamin'] = 76000;
+      catMap['Lainnya'] = 44000;
+      catMap['Obat Bebas'] = 39000;
+      catMap['Alat Kesehatan'] = 25000;
+    }
+
+    const list = Object.entries(catMap).map(([name, amount]) => ({ name, amount }));
+    list.sort((a, b) => b.amount - a.amount);
+    const top4 = list.slice(0, 4);
+    const maxVal = Math.max(...top4.map(i => i.amount), 1);
+    return top4.map(item => ({
+      ...item,
+      pct: Math.min(100, Math.max(14, Math.round((item.amount / maxVal) * 100)))
+    }));
+  }, [todayTransactions, transactions, products]);
+
+  // 4 Transaksi Terakhir
+  const recentTransactions = useMemo(() => {
+    return [...transactions].slice(0, 4);
+  }, [transactions]);
+
+  // Donut SVG circumference math
+  const radius = 38;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (safeStockPct / 100) * circumference;
 
   return (
-    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 22, width: '100%' }}>
-      {/* 1. Header Bar with Quick Action Buttons */}
-      <div style={{
-        display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 16,
-        paddingBottom: 2
-      }}>
-        <div>
-          <h2 className="section-title" style={{ fontSize: '1.4rem' }}>Dashboard & Ringkasan Apotek</h2>
-          <p className="section-subtitle" style={{ fontSize: '0.875rem' }}>
-            Pantau omzet kasir harian, laba bersih, dan status persediaan obat secara mudah dan real-time
-          </p>
-        </div>
-
-        {/* Quick Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary" onClick={() => navigate('/admin/inventory')}>
-            <Plus size={15} /> Tambah Obat
-          </button>
-          <button className="btn btn-secondary" onClick={() => navigate('/admin/inventory')}>
-            <Truck size={15} /> Barang Masuk (PT)
-          </button>
-          <button className="btn btn-secondary" onClick={() => navigate('/admin/reports')}>
-            <FileText size={15} /> Laporan
-          </button>
-          <button className="btn btn-primary" onClick={() => navigate('/admin/pos')}>
-            <ShoppingCart size={15} /> Buka Kasir (POS)
-          </button>
-        </div>
-      </div>
-
-      {/* 2. Stat Cards Grid (4 Columns) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
-        {statCards.map((card, i) => {
-          const Icon = card.icon;
-          return (
-            <div key={i} className="stat-card" style={card.danger ? { borderColor: '#fed7aa' } : {}}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                <div className="icon-box" style={{ background: card.iconBg }}>
-                  <Icon size={20} color={card.iconColor} strokeWidth={2.2} />
-                </div>
-                <span className={`badge ${card.badgeType}`}>{card.badge}</span>
-              </div>
-              <div style={{ marginTop: 8 }}>
-                <p style={{ fontSize: 11.5, fontWeight: 600, color: '#8e95a3', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
-                  {card.label}
-                </p>
-                <p style={{ fontSize: '1.65rem', fontWeight: 800, color: card.danger ? '#d97706' : '#1e2432', lineHeight: 1.1, letterSpacing: '-0.03em' }}>
-                  {card.value}
-                </p>
-                <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 6, fontWeight: 500, lineHeight: 1.4 }}>
-                  {card.sub}
-                </p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* 3. Middle Row: Sales Chart (60%) + Top Selling Drugs (40%) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 18 }}>
-        {/* Sales Chart Card */}
-        <div className="card" style={{ padding: '22px 24px', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1e2432', margin: 0 }}>
-                  Tren Penjualan 7 Hari Terakhir
-                </h3>
-                <span className="badge badge-indigo">Mingguan</span>
-              </div>
-              <p style={{ fontSize: 12.5, color: '#9ca3af', margin: '4px 0 0', fontWeight: 500 }}>
-                Total Omzet: <strong style={{ color: '#1e2432' }}>{formatRupiah(weeklySalesData.weekTotal)}</strong> &bull; Rata-rata/hari: {formatRupiah(weeklySalesData.avgDaily)}
-              </p>
-            </div>
-            <div className="icon-box-sm" style={{ background: '#eeefff' }}>
-              <Activity size={16} color="#4f46e5" />
-            </div>
-          </div>
-
-          {/* Chart Container */}
-          <div style={{ flex: 1, minHeight: 220, display: 'flex', alignItems: 'flex-end', gap: 14, padding: '0 8px 8px' }}>
-            {weeklySalesData.items.map((item, i) => (
-              <div key={i} className="chart-bar">
-                <div className="chart-tooltip">
-                  <div style={{ fontSize: 10.5, color: '#9ca3af' }}>{item.day} ({item.dateStr})</div>
-                  <div style={{ fontSize: 12, fontWeight: 800 }}>{formatRupiah(item.amount)}</div>
-                  {item.profit > 0 && (
-                    <div style={{ color: '#86efac', fontSize: 10.5, marginTop: 1 }}>
-                      Laba +{formatRupiah(item.profit)}
-                    </div>
-                  )}
-                </div>
-                <div className="chart-bar-track">
-                  <div
-                    className={`chart-bar-fill ${item.isToday ? 'active' : ''}`}
-                    style={{ height: `${item.pct}%` }}
-                  />
-                </div>
-                <span className="chart-bar-label" style={item.isToday ? { color: '#4f46e5', fontWeight: 800 } : {}}>
-                  {item.day}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Top Fast-Moving Medicines */}
-        <div className="card" style={{ padding: '22px 24px', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-            <div>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1e2432', margin: 0 }}>
-                Obat Paling Laris
-              </h3>
-              <p style={{ fontSize: 12, color: '#9ca3af', margin: '2px 0 0' }}>Berdasarkan volume penjualan kumulatif</p>
-            </div>
-            <div className="icon-box-sm" style={{ background: '#fef3c7' }}>
-              <Award size={16} color="#d97706" />
-            </div>
-          </div>
-
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14, justifyContent: 'space-around' }}>
-            {topSellingProducts.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '24px 0', color: '#9ca3af', fontSize: 12.5 }}>
-                Belum ada transaksi obat
-              </div>
-            ) : (
-              topSellingProducts.map((p, idx) => (
-                <div key={p.id} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
-                      <span style={{
-                        width: 20, height: 20, borderRadius: 6,
-                        background: idx === 0 ? '#4f46e5' : '#f1f2f6',
-                        color: idx === 0 ? '#fff' : '#6b7280',
-                        fontSize: 11, fontWeight: 800,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                      }}>
-                        {idx + 1}
-                      </span>
-                      <span style={{ fontWeight: 600, color: '#1e2432', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {p.name}
-                      </span>
-                    </div>
-                    <span style={{ fontWeight: 700, color: '#4f46e5', flexShrink: 0, fontSize: 12.5 }}>
-                      {p.totalQty} terjual
-                    </span>
-                  </div>
-                  <div className="progress-pill-track">
-                    <div className="progress-pill-fill" style={{ width: `${p.pct}%` }} />
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Third Row: Today's Live Transactions (60%) + Stock & Restock Alert (40%) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 18 }}>
-        {/* Live Today's Transactions Table */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
-          <div style={{
-            padding: '18px 22px', borderBottom: '1px solid #f0f1f6',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-          }}>
-            <div>
-              <h3 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#1e2432', margin: 0 }}>
-                Transaksi Kasir Hari Ini
-              </h3>
-              <p style={{ fontSize: 12, color: '#9ca3af', margin: '2px 0 0' }}>
-                {todayTransactions.length} pesanan berhasil diproses di kasir POS
-              </p>
-            </div>
-            <button
-              onClick={() => navigate('/admin/reports')}
-              style={{
-                background: 'transparent', border: 'none', color: '#4f46e5',
-                fontSize: 12.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5
-              }}
-            >
-              Semua Laporan <ArrowRight size={14} />
-            </button>
-          </div>
-
-          <div style={{ flex: 1, overflowX: 'auto' }}>
-            {todayTransactions.length === 0 ? (
-              <div className="empty-state" style={{ padding: '36px 16px' }}>
-                <div className="empty-state-icon"><Clock size={22} /></div>
-                <h4>Belum ada transaksi hari ini</h4>
-                <p>Gunakan menu Kasir (POS) untuk melayani pembeli</p>
-              </div>
-            ) : (
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th style={{ paddingLeft: 22 }}>No. Nota</th>
-                    <th>Obat Terjual</th>
-                    <th className="text-right">Total Bayar</th>
-                    <th className="text-right">Laba</th>
-                    <th className="text-center" style={{ paddingRight: 22 }}>Metode</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {todayTransactions.slice(0, 5).map(trx => {
-                    const itemNames = Array.isArray(trx.items) ? trx.items.map(i => `${i.name} (×${i.qty})`).join(', ') : '-';
-                    return (
-                      <tr key={trx.id}>
-                        <td style={{ paddingLeft: 22, fontWeight: 700, color: '#1e2432', fontSize: 13 }}>
-                          {trx.id}
-                        </td>
-                        <td style={{ fontSize: 12.5, color: '#6b7280', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={itemNames}>
-                          {itemNames}
-                        </td>
-                        <td style={{ textAlign: 'right', fontWeight: 700, color: '#1e2432' }}>
-                          {formatRupiah(trx.total)}
-                        </td>
-                        <td style={{ textAlign: 'right', color: '#16a34a', fontWeight: 600 }}>
-                          +{formatRupiah(trx.profit || (trx.total - (trx.total_hpp || 0)))}
-                        </td>
-                        <td style={{ textAlign: 'center', paddingRight: 22 }}>
-                          <span className="badge badge-gray">{trx.payment_method || 'Tunai'}</span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-
-        {/* Stock Alert & Distributor Card */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
-          <div style={{
-            padding: '18px 22px', borderBottom: '1px solid #f0f1f6',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div className="icon-box-sm" style={{ background: '#fff7ed' }}>
-                <AlertTriangle size={16} color="#d97706" />
-              </div>
-              <div>
-                <h3 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#1e2432', margin: 0 }}>
-                  Perlu Restock Distributor
-                </h3>
-                <p style={{ fontSize: 12, color: '#9ca3af', margin: 0 }}>Stok di bawah batas minimum</p>
-              </div>
-            </div>
-            {lowStockProducts.length > 0 && (
-              <span className="badge badge-amber">{lowStockProducts.length} Item</span>
-            )}
-          </div>
-
-          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {lowStockProducts.length === 0 ? (
-              <div className="empty-state" style={{ padding: '32px 16px' }}>
-                <div className="empty-state-icon" style={{ background: '#f0fdf4', color: '#16a34a', borderRadius: 12 }}>
-                  <CheckCircle size={24} />
-                </div>
-                <h4>Semua Stok Aman</h4>
-                <p>Tidak ada obat yang menipis saat ini</p>
-              </div>
-            ) : (
-              lowStockProducts.map(p => (
-                <div
-                  key={p.id}
-                  onClick={() => navigate('/admin/inventory')}
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%' }}>
+      {/* ── BARIS 1: 2 KARTU UTAMA (PENJUALAN & PRIORITAS) ────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.35fr 1fr', gap: 18 }}>
+        {/* KARTU 1: Penjualan Hari Ini & Tab Tunai/QRIS */}
+        <div style={{
+          background: '#ffffff',
+          borderRadius: 22,
+          padding: '24px 28px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 2px 14px rgba(0, 0, 0, 0.025)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          position: 'relative'
+        }}>
+          <div>
+            {/* Tab Filter Pembayaran */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
+              {[
+                { id: 'ALL', label: 'Penjualan' },
+                { id: 'CASH', label: 'Kas tunai' },
+                { id: 'QRIS', label: 'Bank / QRIS' }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setSalesTab(tab.id)}
                   style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '11px 14px', borderRadius: 10, cursor: 'pointer',
-                    background: '#f8f9fc', border: '1px solid #e8eaf0',
+                    padding: '5px 14px',
+                    borderRadius: 9999,
+                    fontSize: 12,
+                    fontWeight: salesTab === tab.id ? 700 : 500,
+                    color: salesTab === tab.id ? '#ffffff' : '#64748b',
+                    background: salesTab === tab.id ? '#0f172a' : '#f8fafc',
+                    border: `1px solid ${salesTab === tab.id ? '#0f172a' : '#e2e8f0'}`,
+                    cursor: 'pointer',
                     transition: 'all 0.15s ease'
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#c7d2fe'; e.currentTarget.style.background = '#ffffff'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#e8eaf0'; e.currentTarget.style.background = '#f8f9fc'; }}
                 >
-                  <div style={{ minWidth: 0, flex: 1, paddingRight: 8 }}>
-                    <p style={{ fontSize: '0.8375rem', fontWeight: 700, color: '#1e2432', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {p.name}
-                    </p>
-                    <p style={{ fontSize: 11.5, color: '#8e95a3', margin: '2px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {p.location} &bull; {p.supplier?.split(' ')[1] || 'Distributor PT'}
-                    </p>
-                  </div>
-                  <span className={`badge ${p.stock <= 5 ? 'badge-red' : 'badge-amber'}`} style={{ flexShrink: 0 }}>
-                    Sisa {p.stock} pcs
-                  </span>
-                </div>
-              ))
-            )}
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 6px', fontWeight: 600 }}>
+              Penjualan hari ini
+            </p>
+            <div style={{ fontSize: '2.3rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.035em', lineHeight: 1.1 }}>
+              {formatRupiah(displaySalesAmount)}
+            </div>
+            <p style={{ fontSize: 12.5, color: '#94a3b8', margin: '8px 0 0', fontWeight: 500 }}>
+              {todayTransactions.length} transaksi &bull; Rata-rata {formatRupiah(avgPerTrx)}
+            </p>
           </div>
 
-          <div style={{ padding: '12px 16px', borderTop: '1px solid #f0f1f6' }}>
+          {/* Tombol Aksi Cepat Buka Kasir & Laporan */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 22 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => navigate('/admin/pos')}
+                style={{
+                  background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: 9999,
+                  padding: '7px 18px',
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(15, 23, 42, 0.2)'
+                }}
+              >
+                Buka kasir
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/admin/reports')}
+                style={{
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 9999,
+                  padding: '7px 18px',
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Laporan
+              </button>
+            </div>
+
+            {/* Jump Arrow Button */}
             <button
-              onClick={() => navigate('/admin/inventory')}
+              type="button"
+              onClick={() => navigate('/admin/reports')}
               style={{
-                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                fontSize: 12.5, fontWeight: 700, color: '#4f46e5',
-                background: '#eeefff', border: 'none', cursor: 'pointer',
-                padding: '10px', borderRadius: 8, fontFamily: 'inherit'
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                color: '#0f172a',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
               }}
+              title="Lihat detail laporan penjualan"
             >
-              Input Faktur Masuk (PT) <ArrowRight size={14} />
+              <ArrowUpRight size={16} />
             </button>
           </div>
         </div>
+
+        {/* KARTU 2: Prioritas Apotek & Stok Menipis */}
+        <div style={{
+          background: '#ffffff',
+          borderRadius: 22,
+          padding: '24px 28px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 2px 14px rgba(0, 0, 0, 0.025)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          position: 'relative'
+        }}>
+          <div>
+            <span style={{
+              display: 'inline-block',
+              background: '#fef2f2',
+              color: '#dc2626',
+              border: '1px solid #fecaca',
+              borderRadius: 9999,
+              padding: '2px 10px',
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: '0.04em'
+            }}>
+              PRIORITAS
+            </span>
+
+            <p style={{ fontSize: 13, color: '#64748b', margin: '14px 0 6px', fontWeight: 600 }}>
+              Stok di bawah minimum
+            </p>
+            <div style={{ fontSize: '2.3rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.035em', lineHeight: 1.1 }}>
+              {lowStockProducts.length} <span style={{ fontSize: '1.2rem', fontWeight: 700, color: '#64748b' }}>produk</span>
+            </div>
+          </div>
+
+          {/* Sub-tiles: Kritis & Pesanan / Faktur Masuk */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 18 }}>
+            <div 
+              onClick={() => navigate('/admin/inventory')}
+              style={{
+                background: '#f8fafc',
+                borderRadius: 14,
+                padding: '10px 14px',
+                cursor: 'pointer',
+                border: '1px solid #e2e8f0'
+              }}
+            >
+              <p style={{ fontSize: 11.5, color: '#64748b', margin: 0, fontWeight: 500 }}>Stok sangat kritis</p>
+              <p style={{ fontSize: 14, fontWeight: 800, color: '#dc2626', margin: '4px 0 0' }}>
+                {criticalStockProducts.length} produk
+              </p>
+            </div>
+
+            <div 
+              onClick={() => navigate('/admin/inventory')}
+              style={{
+                background: '#f8fafc',
+                borderRadius: 14,
+                padding: '10px 14px',
+                cursor: 'pointer',
+                border: '1px solid #e2e8f0'
+              }}
+            >
+              <p style={{ fontSize: 11.5, color: '#64748b', margin: 0, fontWeight: 500 }}>Faktur masuk PT</p>
+              <p style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', margin: '4px 0 0' }}>
+                {incomingGoods.length} Faktur (PO)
+              </p>
+            </div>
+          </div>
+
+          {/* Jump Arrow Button */}
+          <button
+            type="button"
+            onClick={() => navigate('/admin/inventory')}
+            style={{
+              position: 'absolute',
+              top: 24,
+              right: 24,
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              color: '#0f172a',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer'
+            }}
+            title="Buka katalog inventaris obat"
+          >
+            <ArrowUpRight size={16} />
+          </button>
+        </div>
       </div>
 
-      {/* 5. Fourth Row: Bottom Operational & Cashflow Breakdown Card */}
-      <div className="card" style={{
-        padding: '18px 24px',
-        background: 'linear-gradient(135deg, #ffffff 0%, #f8fafd 100%)',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-        gap: 20,
-        alignItems: 'center'
-      }}>
-        {/* Cash vs QRIS */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div className="icon-box" style={{ background: '#f0fdf4' }}>
-            <Banknote size={20} color="#16a34a" />
-          </div>
+      {/* ── BARIS 2: 3 KARTU SEIMBANG (PERSEDIAAN, KATEGORI, TRANSAKSI) ──── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
+        {/* KARTU 3: Persediaan & Donut Chart Kesehatan Stok */}
+        <div style={{
+          background: '#ffffff',
+          borderRadius: 22,
+          padding: '22px 24px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 2px 14px rgba(0, 0, 0, 0.025)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between'
+        }}>
           <div>
-            <p style={{ fontSize: 11.5, fontWeight: 700, color: '#8e95a3', textTransform: 'uppercase', letterSpacing: '0.04em', margin: 0 }}>
-              Kas Masuk Kasir (Tunai vs Non-Tunai)
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ fontSize: '0.975rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                Persediaan
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => navigate('/admin/inventory')}
+                style={{ background: 'none', border: 'none', fontSize: 12, fontWeight: 700, color: '#0f172a', cursor: 'pointer', padding: 0 }}
+              >
+                Inventori
+              </button>
+            </div>
+
+            {/* Donut Chart Ring */}
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 14px' }}>
+              <div style={{ position: 'relative', width: 110, height: 110 }}>
+                <svg width="110" height="110" viewBox="0 0 100 100">
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r={radius}
+                    fill="transparent"
+                    stroke="#f1f5f9"
+                    strokeWidth="9"
+                  />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r={radius}
+                    fill="transparent"
+                    stroke="#059669"
+                    strokeWidth="9"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={strokeDashoffset}
+                    strokeLinecap="round"
+                    transform="rotate(-90 50 50)"
+                    style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+                  />
+                </svg>
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>
+                    {safeStockPct}%
+                  </div>
+                  <div style={{ fontSize: 10.5, color: '#059669', fontWeight: 700, marginTop: 3 }}>
+                    Stok aman
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <p style={{ textAlign: 'center', fontSize: 12, color: '#64748b', margin: '0 0 16px' }}>
+              {safeStockCount} dari {products.length} produk sesuai stok minimum
             </p>
-            <p style={{ fontSize: '1.05rem', fontWeight: 800, color: '#1e2432', margin: '3px 0 0' }}>
-              Tunai: {formatRupiah(paymentBreakdown.tunai)} &bull; QRIS: {formatRupiah(paymentBreakdown.nonTunai)}
-            </p>
+          </div>
+
+          {/* Bottom Summary Rows */}
+          <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
+              <span style={{ color: '#64748b' }}>Perlu restock</span>
+              <span style={{ fontWeight: 800, color: '#dc2626' }}>{lowStockProducts.length} produk</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
+              <span style={{ color: '#64748b' }}>Stok kritis (&le;5 pcs)</span>
+              <span style={{ fontWeight: 800, color: '#0f172a' }}>{criticalStockProducts.length} produk</span>
+            </div>
           </div>
         </div>
 
-        {/* Realtime Sync Status */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div className="icon-box" style={{ background: '#eff6ff' }}>
-            <RefreshCw size={20} color="#2563eb" />
-          </div>
+        {/* KARTU 4: Penjualan Menurut Kategori Obat */}
+        <div style={{
+          background: '#ffffff',
+          borderRadius: 22,
+          padding: '22px 24px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 2px 14px rgba(0, 0, 0, 0.025)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between'
+        }}>
           <div>
-            <p style={{ fontSize: 11.5, fontWeight: 700, color: '#8e95a3', textTransform: 'uppercase', letterSpacing: '0.04em', margin: 0 }}>
-              Otomasi Sistem Kasir & HPP
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ fontSize: '0.975rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                Penjualan
+              </h3>
+              <span style={{ fontSize: 11.5, color: '#94a3b8', fontWeight: 600 }}>Hari ini</span>
+            </div>
+
+            <div style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.025em', margin: '2px 0 4px' }}>
+              {formatRupiah(totalSalesToday)}
+            </div>
+            <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 18px', fontWeight: 500 }}>
+              Kontribusi menurut kategori
             </p>
-            <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#374151', margin: '3px 0 0' }}>
-              Stok berkurang otomatis & laba bersih dihitung real-time per transaksi.
-            </p>
+
+            {/* List Kategori dengan Bar Progress */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {categorySales.map((cat, idx) => (
+                <div key={idx}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 5 }}>
+                    <span style={{ fontWeight: 600, color: '#334155' }}>{cat.name}</span>
+                    <span style={{ fontWeight: 800, color: '#0f172a' }}>{formatRupiah(cat.amount)}</span>
+                  </div>
+                  <div style={{ width: '100%', height: 6, background: '#f1f5f9', borderRadius: 9999, overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${cat.pct}%`,
+                      height: '100%',
+                      background: 'linear-gradient(90deg, #0f172a 0%, #334155 100%)',
+                      borderRadius: 9999
+                    }} />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Quality Guarantee */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div className="icon-box" style={{ background: '#faf5ff' }}>
-            <ShieldCheck size={20} color="#7c3aed" />
-          </div>
+        {/* KARTU 5: Transaksi Kasir Real-Time */}
+        <div style={{
+          background: '#ffffff',
+          borderRadius: 22,
+          padding: '22px 24px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 2px 14px rgba(0, 0, 0, 0.025)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between'
+        }}>
           <div>
-            <p style={{ fontSize: 11.5, fontWeight: 700, color: '#8e95a3', textTransform: 'uppercase', letterSpacing: '0.04em', margin: 0 }}>
-              Distribusi Resmi & Terdaftar
-            </p>
-            <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#374151', margin: '3px 0 0' }}>
-              Faktur penerimaan barang terekam lengkap dengan supplier PT/PBF.
-            </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <h3 style={{ fontSize: '0.975rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                Transaksi
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => navigate('/admin/reports')}
+                style={{ background: 'none', border: 'none', fontSize: 12, fontWeight: 700, color: '#0f172a', cursor: 'pointer', padding: 0 }}
+              >
+                Semua
+              </button>
+            </div>
+
+            {/* List 4 Transaksi Terakhir */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {recentTransactions.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '24px 0', color: '#94a3b8', fontSize: 12.5 }}>
+                  Belum ada transaksi kasir hari ini
+                </div>
+              ) : (
+                recentTransactions.map((trx, idx) => {
+                  const initials = (trx.cashier || 'PU').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                  const timeStr = formatDateTime(trx.date, tz).split(',')[1] || 'Baru saja';
+
+                  return (
+                    <div key={trx.id || idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: '50%',
+                          background: '#f8fafc',
+                          color: '#0f172a',
+                          border: '1px solid #e2e8f0',
+                          fontSize: 11,
+                          fontWeight: 800,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}>
+                          {initials}
+                        </div>
+                        <div>
+                          <p style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a', margin: 0, lineHeight: 1.2 }}>
+                            {trx.customer || 'Pelanggan umum'}
+                          </p>
+                          <p style={{ fontSize: 11, color: '#94a3b8', margin: '2px 0 0' }}>
+                            {trx.id} &bull; {timeStr.trim()}
+                          </p>
+                        </div>
+                      </div>
+
+                      <span style={{ fontSize: 12.5, fontWeight: 800, color: '#0f172a' }}>
+                        {formatRupiah(trx.total)}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Bottom Buka Kasir Button */}
+          <div style={{ marginTop: 16, textAlign: 'center' }}>
+            <button
+              type="button"
+              onClick={() => navigate('/admin/pos')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#0f172a',
+                fontSize: 12.5,
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5
+              }}
+            >
+              <span>Buka kasir</span>
+              <ChevronRight size={14} />
+            </button>
           </div>
         </div>
       </div>

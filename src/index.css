@@ -56,31 +56,43 @@
 }
 
 @layer components {
-  /* === SIDEBAR === */
-  /* === SIDEBAR === */
+  /* === SIDEBAR (Hidden in modern Top-Pill Layout) === */
   .sidebar-root {
-    position: fixed;
-    left: 0;
-    top: 0;
-    width: 260px;
-    height: 100vh;
-    background: #ffffff;
-    border-right: 1px solid #e8eaf0;
-    display: flex;
-    flex-direction: column;
-    z-index: 30;
-    box-shadow: 2px 0 20px rgba(0,0,0,0.03);
-    transition: transform 0.25s ease;
+    display: none;
   }
 
-  /* === MAIN LAYOUT === */
+  /* === MAIN LAYOUT (Full Width Modern Clean White Shell) === */
   .main-layout {
-    margin-left: 260px;
+    margin-left: 0;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    background: #f5f6fa;
-    width: calc(100% - 260px);
+    background: #f8fafc;
+    width: 100%;
+  }
+
+  /* === TOP PILL NAVBAR === */
+  .top-pill-navbar {
+    width: 100%;
+    max-width: 1400px;
+    margin: 14px auto 0;
+    padding: 0 20px;
+    box-sizing: border-box;
+    position: sticky;
+    top: 12px;
+    z-index: 40;
+  }
+
+  .top-pill-navbar-inner {
+    background: #ffffff;
+    border-radius: 9999px;
+    padding: 8px 14px 8px 18px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.04);
+    display: flex;
+    align-items: center;
+    justifyContent: space-between;
+    gap: 12px;
   }
 
   /* === BOTTOM NAV (Mobile) === */
@@ -109,9 +121,11 @@
 
   /* === PAGE CONTAINER === */
   .page-container {
-    padding: 24px 32px 36px;
+    padding: 20px 20px 48px;
     flex: 1;
     width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
