@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Pill, Lock, PhoneCall } from 'lucide-react';
+import { Pill, PhoneCall } from 'lucide-react';
 import { Button } from '../ui/Button';
 
 export function StorefrontHeader({ settings }) {
@@ -28,26 +28,19 @@ export function StorefrontHeader({ settings }) {
             <Link to="/" className="text-sm font-semibold text-slate-600 hover:text-indigo-600 transition-colors">Beranda</Link>
             <a href="#products" className="text-sm font-semibold text-slate-600 hover:text-indigo-600 transition-colors">Katalog Obat</a>
             <a href="#about" className="text-sm font-semibold text-slate-600 hover:text-indigo-600 transition-colors">Tentang Kami</a>
+          </nav>
+          
+          <div className="flex items-center gap-4">
             <a 
               href={`https://wa.me/${cleanWa}?text=Halo%20Apotek,%20saya%20ingin%20konsultasi%20obat`} 
               target="_blank" 
               rel="noreferrer"
-              className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 transition-colors flex items-center gap-1.5"
             >
-              <PhoneCall size={14} /> Konsultasi Resep
-            </a>
-          </nav>
-          
-          <div className="flex items-center gap-4">
-            <Link to="/login">
-              <Button variant="outline" className="hidden sm:flex items-center gap-2 border-slate-300 text-slate-700 hover:text-indigo-600 hover:border-indigo-300 text-xs py-2 px-3.5">
-                <Lock size={14} />
-                <span>Portal Petugas</span>
+              <Button className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-sm transition-all">
+                <PhoneCall size={14} />
+                <span>Konsultasi Resep</span>
               </Button>
-            </Link>
-            <Link to="/login" className="sm:hidden text-slate-500 hover:text-indigo-600 transition-colors" title="Login Petugas">
-              <Lock size={20} />
-            </Link>
+            </a>
           </div>
         </div>
       </div>

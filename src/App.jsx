@@ -13,16 +13,27 @@ import { StorefrontHeader } from './components/layout/StorefrontHeader';
 import { OpenShiftModal, CloseShiftModal } from './components/shift/ShiftModals';
 import { storage } from './services/storage';
 import { ToastProvider, useToast } from './context/ToastContext';
-import { ROLES } from './config/auth';
+import { ROLES, USER_STATUS } from './config/auth';
 import { PWAInstallBanner } from './components/pwa/InstallPrompt';
 
-// Protected Route Guard
-function ProtectedRoute({ currentUser, allowedRoles, children }) {
+// Protected Route Guard with anti-tamper session integrity
+function ProtectedRoute({ currentUser, users, allowedRoles, children }) {
   if (!currentUser) {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
+  // Validate session against active registered users in system memory/storage
+  const validUser = (users || []).find(
+    u => u.id === currentUser.id && u.username === currentUser.username && u.status !== USER_STATUS.INACTIVE
+  );
+
+  // If user does not exist, was deactivated, or role was tampered with in storage
+  if (!validUser || validUser.role !== currentUser.role) {
+    storage.removeUser();
+    return <Navigate to="/login" replace />;
+  }
+
+  if (allowedRoles && !allowedRoles.includes(validUser.role)) {
     // If not allowed, redirect staff to POS
     return <Navigate to="/admin/pos" replace />;
   }
@@ -102,8 +113,9 @@ function MainApp() {
   };
 
   const handleLoginSuccess = (user) => {
-    setCurrentUser(user);
-    storage.setUser(user);
+    const { password: _, ...safeUser } = user;
+    setCurrentUser(safeUser);
+    storage.setUser(safeUser);
   };
 
   const handleLogout = () => {
@@ -195,6 +207,7 @@ function MainApp() {
             />
           } 
         />
+        <Route path="/admin/login" element={<Navigate to="/login" replace />} />
 
         {/* Admin Catch Redirect */}
         <Route 
@@ -214,7 +227,7 @@ function MainApp() {
         <Route 
           path="/admin/dashboard" 
           element={
-            <ProtectedRoute currentUser={currentUser} allowedRoles={[ROLES.OWNER]}>
+            <ProtectedRoute currentUser={currentUser} users={users} allowedRoles={[ROLES.OWNER]}>
               <Layout 
                 settings={settings} 
                 products={products}
@@ -240,7 +253,7 @@ function MainApp() {
         <Route 
           path="/admin/inventory" 
           element={
-            <ProtectedRoute currentUser={currentUser}>
+            <ProtectedRoute currentUser={currentUser} users={users}>
               <Layout 
                 settings={settings} 
                 products={products}
@@ -269,7 +282,7 @@ function MainApp() {
         <Route 
           path="/admin/pos" 
           element={
-            <ProtectedRoute currentUser={currentUser}>
+            <ProtectedRoute currentUser={currentUser} users={users}>
               <Layout 
                 settings={settings} 
                 products={products}
@@ -299,7 +312,7 @@ function MainApp() {
         <Route 
           path="/admin/reports" 
           element={
-            <ProtectedRoute currentUser={currentUser} allowedRoles={[ROLES.OWNER]}>
+            <ProtectedRoute currentUser={currentUser} users={users} allowedRoles={[ROLES.OWNER]}>
               <Layout 
                 settings={settings} 
                 products={products}
@@ -324,7 +337,7 @@ function MainApp() {
         <Route 
           path="/admin/shifts" 
           element={
-            <ProtectedRoute currentUser={currentUser}>
+            <ProtectedRoute currentUser={currentUser} users={users}>
               <Layout 
                 settings={settings} 
                 products={products}
@@ -352,7 +365,7 @@ function MainApp() {
         <Route 
           path="/admin/staff" 
           element={
-            <ProtectedRoute currentUser={currentUser} allowedRoles={[ROLES.OWNER]}>
+            <ProtectedRoute currentUser={currentUser} users={users} allowedRoles={[ROLES.OWNER]}>
               <Layout 
                 settings={settings} 
                 products={products}

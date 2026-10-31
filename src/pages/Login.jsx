@@ -1,38 +1,61 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Lock, ArrowRight, Store, KeyRound, AlertCircle, Cross } from 'lucide-react';
+import { Lock, Store, KeyRound, AlertCircle, Cross, Eye, EyeOff, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { DEFAULT_USERS, ROLES, USER_STATUS } from '../config/auth';
 import { useToast } from '../context/ToastContext';
+
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_SEC = 60;
 
 export function Login({ onLoginSuccess, settings, users = [] }) {
   const navigate = useNavigate();
   const toast = useToast();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  
+  // Rate limiting / Brute force protection
+  const [failedAttempts, setFailedAttempts] = useState(() => {
+    const saved = sessionStorage.getItem('login_failed_attempts');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  const [lockoutTimer, setLockoutTimer] = useState(() => {
+    const lockedUntil = sessionStorage.getItem('login_locked_until');
+    if (!lockedUntil) return 0;
+    const remaining = Math.ceil((parseInt(lockedUntil, 10) - Date.now()) / 1000);
+    return remaining > 0 ? remaining : 0;
+  });
 
   const pharmacyName = settings?.nama_apotek || 'Apotek Medika Sejahtera';
   const userList = users && users.length > 0 ? users : DEFAULT_USERS;
-  const activeUsers = userList.filter(u => u.status !== USER_STATUS.INACTIVE);
 
-  const handleQuickLogin = (user) => {
-    if (user.status === USER_STATUS.INACTIVE) {
-      setError(`Akun ${user.name} berstatus Nonaktif (Resign / Keluar).`);
-      toast.error('Akun telah dinonaktifkan oleh Owner');
-      return;
-    }
-    onLoginSuccess(user);
-    toast.success(`Selamat datang, ${user.name}! Masuk sebagai ${user.roleTitle || user.role}`);
-    if (user.role === ROLES.OWNER) {
-      navigate('/admin/dashboard');
-    } else {
-      navigate('/admin/pos');
-    }
-  };
+  // Countdown timer for lockout
+  useEffect(() => {
+    if (lockoutTimer <= 0) return;
+    const interval = setInterval(() => {
+      setLockoutTimer(prev => {
+        if (prev <= 1) {
+          sessionStorage.removeItem('login_locked_until');
+          sessionStorage.removeItem('login_failed_attempts');
+          setFailedAttempts(0);
+          setError('');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lockoutTimer]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
+
+    if (lockoutTimer > 0) {
+      setError(`Akses diblokir sementara karena terlalu banyak percobaan gagal. Silakan tunggu ${lockoutTimer} detik.`);
+      return;
+    }
 
     const trimmedUser = username.trim().toLowerCase();
     const matchedUser = userList.find(
@@ -42,21 +65,48 @@ export function Login({ onLoginSuccess, settings, users = [] }) {
     if (matchedUser) {
       if (matchedUser.status === USER_STATUS.INACTIVE) {
         setError('Akun ini telah dinonaktifkan oleh Owner (Karyawan Keluar / Resign). Akses login ditolak.');
-        toast.error('Akun dinonaktifkan');
+        toast.error('Akun telah dinonaktifkan oleh Owner');
         return;
       }
 
-      onLoginSuccess(matchedUser);
-      toast.success(`Login berhasil sebagai ${matchedUser.name}`);
+      // Reset brute force counter upon success
+      sessionStorage.removeItem('login_failed_attempts');
+      sessionStorage.removeItem('login_locked_until');
+      setFailedAttempts(0);
+
+      // Safe user session without storing password
+      const { password: _, ...safeUser } = matchedUser;
+      onLoginSuccess(safeUser);
+      toast.success(`Selamat datang, ${matchedUser.name}!`);
+
       if (matchedUser.role === ROLES.OWNER) {
         navigate('/admin/dashboard');
       } else {
         navigate('/admin/pos');
       }
     } else {
-      setError('Username atau kata sandi tidak cocok. Silakan gunakan kredensial yang terdaftar atau pilih tombol akses cepat.');
-      toast.error('Kredensial login tidak valid');
+      const nextAttempts = failedAttempts + 1;
+      setFailedAttempts(nextAttempts);
+      sessionStorage.setItem('login_failed_attempts', String(nextAttempts));
+
+      if (nextAttempts >= MAX_FAILED_ATTEMPTS) {
+        const lockUntil = Date.now() + (LOCKOUT_DURATION_SEC * 1000);
+        sessionStorage.setItem('login_locked_until', String(lockUntil));
+        setLockoutTimer(LOCKOUT_DURATION_SEC);
+        setError(`Terlalu banyak percobaan login yang gagal. Akses diblokir selama ${LOCKOUT_DURATION_SEC} detik demi keamanan data apotek.`);
+        toast.error('Akses diblokir sementara');
+      } else {
+        const sisa = MAX_FAILED_ATTEMPTS - nextAttempts;
+        setError(`Username atau kata sandi tidak cocok. Sisa percobaan: ${sisa} kali sebelum diblokir.`);
+        toast.error('Kredensial login tidak valid');
+      }
     }
+  };
+
+  const handleFillDemo = (u, p) => {
+    setUsername(u);
+    setPassword(p);
+    setError('');
   };
 
   return (
@@ -89,7 +139,7 @@ export function Login({ onLoginSuccess, settings, users = [] }) {
           </div>
           <div>
             <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1e2432' }}>{pharmacyName}</div>
-            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Portal Login Petugas & Owner</div>
+            <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Portal Khusus Staf & Owner</div>
           </div>
         </div>
 
@@ -111,7 +161,7 @@ export function Login({ onLoginSuccess, settings, users = [] }) {
       }}>
         <div style={{
           width: '100%',
-          maxWidth: 490,
+          maxWidth: 440,
           background: '#ffffff',
           borderRadius: 20,
           boxShadow: '0 12px 40px rgba(15, 23, 42, 0.08)',
@@ -142,144 +192,142 @@ export function Login({ onLoginSuccess, settings, users = [] }) {
               Portal Petugas Apotek
             </h1>
             <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
-              Masuk dengan akun terdaftar untuk mengelola apotek dan melayani kasir
+              Masukkan username dan kata sandi terdaftar untuk mengakses sistem
             </p>
           </div>
 
           <div style={{ padding: '24px 28px' }}>
-            {/* Quick Login Options */}
-            <div style={{
-              fontSize: 11.5,
-              fontWeight: 700,
-              color: '#64748b',
-              textTransform: 'uppercase',
-              letterSpacing: '0.07em',
-              marginBottom: 12
-            }}>
-              Akses Cepat (Akun Terdaftar)
-            </div>
+            {/* Lockout Banner */}
+            {lockoutTimer > 0 && (
+              <div style={{
+                background: '#fef2f2',
+                border: '1.5px solid #fecaca',
+                borderRadius: 12,
+                padding: '12px 14px',
+                marginBottom: 16,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                color: '#991b1b',
+                fontSize: 12.5
+              }}>
+                <ShieldAlert size={20} color="#dc2626" style={{ flexShrink: 0 }} />
+                <div>
+                  <strong>Akses Terkunci Sementara ({lockoutTimer}s)</strong>
+                  <div style={{ fontSize: 11.5, marginTop: 2 }}>Terlalu banyak percobaan sandi salah. Tunggu hitungan mundur selesai.</div>
+                </div>
+              </div>
+            )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 220, overflowY: 'auto', paddingRight: 2 }}>
-              {activeUsers.map(user => {
-                const isSuper = user.role === ROLES.OWNER;
-                return (
-                  <div
-                    key={user.id}
-                    onClick={() => handleQuickLogin(user)}
-                    style={{
-                      border: `1.5px solid ${isSuper ? '#c7d2fe' : '#bbf7d0'}`,
-                      borderRadius: 12,
-                      padding: '12px 14px',
-                      background: isSuper ? '#f5f7ff' : '#f0fdf4',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      transition: 'all 0.15s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = isSuper ? '#4f46e5' : '#16a34a';
-                      e.currentTarget.style.transform = 'translateY(-2px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = isSuper ? '#c7d2fe' : '#bbf7d0';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}
-                  >
-                    <div style={{
-                      width: 38,
-                      height: 38,
-                      borderRadius: 10,
-                      background: isSuper ? '#4f46e5' : '#16a34a',
-                      color: '#ffffff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 800,
-                      fontSize: 13,
-                      flexShrink: 0
-                    }}>
-                      {isSuper ? '👑' : '💼'}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                        <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e2432' }}>
-                          {user.name}
-                        </span>
-                        <span className={`badge ${isSuper ? 'badge-indigo' : 'badge-green'}`} style={{ fontSize: 9.5, padding: '1px 5px' }}>
-                          {isSuper ? 'OWNER' : 'KARYAWAN'}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: 11, color: isSuper ? '#4f46e5' : '#15803d', fontWeight: 600 }}>
-                        {user.roleTitle || (isSuper ? 'Akses Penuh Finansial & HPP' : 'Akses Kasir Shift & Cek Rak')}
-                      </div>
-                    </div>
-                    <ArrowRight size={15} color={isSuper ? '#4f46e5' : '#16a34a'} />
-                  </div>
-                );
-              })}
-            </div>
+            {/* Error Message */}
+            {error && lockoutTimer <= 0 && (
+              <div className="alert-error" style={{ fontSize: 12, marginBottom: 16 }}>
+                <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                <span>{error}</span>
+              </div>
+            )}
 
-            {/* Separator */}
-            <div style={{ margin: '20px 0 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ height: 1, flex: 1, background: '#e2e8f0' }} />
-              <span style={{ fontSize: 11.5, color: '#94a3b8', fontWeight: 600 }}>atau login manual</span>
-              <div style={{ height: 1, flex: 1, background: '#e2e8f0' }} />
-            </div>
-
-            {/* Manual Form */}
+            {/* Authentication Form */}
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label className="form-label" style={{ fontSize: 12 }}>Username</label>
+                <label className="form-label" style={{ fontSize: 12 }}>Username Petugas / Owner *</label>
                 <input
                   className="form-input"
                   type="text"
                   placeholder="Ketik username Anda"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
+                  disabled={lockoutTimer > 0}
+                  required
+                  autoFocus
                   style={{ height: 42, fontSize: 13 }}
                 />
               </div>
 
               <div>
-                <label className="form-label" style={{ fontSize: 12 }}>Kata Sandi</label>
-                <input
-                  className="form-input"
-                  type="password"
-                  placeholder="Ketik kata sandi"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={{ height: 42, fontSize: 13 }}
-                />
-              </div>
-
-              {error && (
-                <div className="alert-error" style={{ fontSize: 12 }}>
-                  <AlertCircle size={15} />
-                  <span>{error}</span>
+                <label className="form-label" style={{ fontSize: 12 }}>Kata Sandi *</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    className="form-input"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Ketik kata sandi"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={lockoutTimer > 0}
+                    required
+                    style={{ height: 42, fontSize: 13, paddingRight: 40 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: 10,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#9ca3af',
+                      padding: 4
+                    }}
+                    title={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
-              )}
+              </div>
 
               <button
                 type="submit"
                 className="btn btn-primary btn-lg"
-                style={{ width: '100%', borderRadius: 10, height: 44, marginTop: 4 }}
+                disabled={lockoutTimer > 0}
+                style={{ width: '100%', borderRadius: 10, height: 44, marginTop: 6 }}
               >
                 <KeyRound size={16} /> Masuk ke Sistem Apotek
               </button>
             </form>
+
+            {/* Demo / Testing Autofill Hint (Fills input only, still validates credentials) */}
+            <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px', textAlign: 'center' }}>
+                Akun Terdaftar (Uji Coba Demo)
+              </p>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => handleFillDemo('owner', 'owner123')}
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6 }}
+                >
+                  👑 Isi Akun Owner
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleFillDemo('siti', 'siti123')}
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6 }}
+                >
+                  💼 Isi Akun Kasir (Siti)
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Footer note */}
           <div style={{
-            padding: '14px 28px',
+            padding: '12px 28px',
             background: '#f8fafc',
             borderTop: '1px solid #f1f5f9',
             fontSize: 11.5,
             color: '#64748b',
-            textAlign: 'center'
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6
           }}>
-            🛡️ Dilengkapi enkripsi sesi dan pembatasan akses hak karyawan secara ketat.
+            <ShieldCheck size={14} color="#16a34a" />
+            <span>Dilindungi pembatasan percobaan login & verifikasi hak akses</span>
           </div>
         </div>
       </div>
